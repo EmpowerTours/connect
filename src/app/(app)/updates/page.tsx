@@ -2,6 +2,7 @@ import { Sparkles, Users } from "lucide-react";
 import Link from "next/link";
 import type { PostCtx } from "@/components/post-card";
 import { UserAvatar } from "@/components/avatar";
+import { avatarUrl } from "@/lib/media";
 import { Composer } from "@/components/composer";
 import { EmptyState } from "@/components/empty-state";
 import { Columns, PageHeader, Tabs } from "@/components/layout";
@@ -30,7 +31,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         />
       </PageHeader>
       <div className="border-b border-line" id="compose">
-        <Composer locale={locale} channels={ctx.channels} author={<UserAvatar name={user.name} seed={user.handle} size={42} />} />
+        <Composer locale={locale} channels={ctx.channels} author={<UserAvatar name={user.name} seed={user.handle} src={avatarUrl(user.avatarKey)} size={42} />} />
       </div>
       {/* Rendered inline (no Suspense/loading.tsx): in Next 15.5 streamed boundaries here stopped server-action refreshes from applying. */}
       {await HomeFeed({ viewerId: user.id, tab, ctx })}

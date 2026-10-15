@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { Hash, MessageSquarePlus } from "lucide-react";
 import { toggleChannelAction } from "@/app/actions";
 import { UserAvatar } from "@/components/avatar";
+import { avatarUrl } from "@/lib/media";
 import { Composer } from "@/components/composer";
 import { EmptyState } from "@/components/empty-state";
 import { Columns, PageHeader } from "@/components/layout";
@@ -56,7 +57,7 @@ export default async function ChannelPage({ params }: { params: Promise<{ slug: 
         </div>
       </section>
       <div className="hidden border-b border-line md:block">
-        <Composer locale={locale} channels={ctx.channels} defaultChannel={channel.slug} author={<UserAvatar name={user.name} seed={user.handle} size={42} />} />
+        <Composer locale={locale} channels={ctx.channels} defaultChannel={channel.slug} author={<UserAvatar name={user.name} seed={user.handle} src={avatarUrl(user.avatarKey)} size={42} />} />
       </div>
       {items.length === 0 ? (
         <EmptyState icon={MessageSquarePlus} title={t(locale, "channels.emptyTitle")} body={t(locale, "channels.emptyBody")} />

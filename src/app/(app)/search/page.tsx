@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Building2, Hash, Search } from "lucide-react";
 import { OrgLogo, UserAvatar } from "@/components/avatar";
+import { avatarUrl } from "@/lib/media";
 import { DemoBadge } from "@/components/badges";
 import { Columns, PageHeader } from "@/components/layout";
 import { PostCard } from "@/components/post-card";
@@ -43,7 +44,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
           <h2 className={head}>{t(locale, "search.people")}</h2>
           {people.map((p) => (
             <Link key={p.id} href={`/u/${p.handle}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-black/[0.03]">
-              <UserAvatar name={p.name} seed={p.handle} size={40} />
+              <UserAvatar name={p.name} seed={p.handle} src={avatarUrl(p.avatarKey)} size={40} />
               <span className="min-w-0">
                 <span className="flex items-center gap-1.5 font-semibold">{p.name} {p.isDemo && <DemoBadge locale={locale} />}</span>
                 <span className="block truncate text-sm text-faint">@{p.handle} · {[p.headline, p.orgName].filter(Boolean).join(" @ ")}</span>

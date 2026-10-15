@@ -4,7 +4,7 @@ Lives at **https://connect.empowertours.xyz**. Powered by Monad; sign-in is Mera
 
 **Warm intros and partnerships for institutional blockchain BD.** A professional network for crypto foundations / L1s, financial institutions (banks, exchanges, custodians, asset managers, market infrastructure), fintechs and LatAm payment rails, consultancies and builders.
 
-Mobile-first and calm: three tabs. **Today** greets you, shows one insight from public news signals and the intro requests waiting on you. **Opportunities** is a wallet-style stack of asks and offers, each with a "Request intro" that uses your warm path. **Circle** draws your warm network as an orbit (connections on the inner ring, people one intro away on the outer ring); tap someone to see the path and request the intro. Profiles are proof-based, and a private pipeline ("My deals") is still there.
+Mobile-first and calm: three tabs. **Today** greets you, shows one insight from public news signals, a getting-started checklist for new members and the intro requests waiting on you. **Opportunities** is a wallet-style stack of live asks and offers by topic, each with a "Request intro" (through a mutual connection when there is one, otherwise straight to the author). **Circle** draws your warm network as an orbit (connections on the inner ring, people one intro away on the outer ring); tap someone to see the path and request the intro. Profiles are proof-based, and a private pipeline ("My deals") is still there.
 
 > Local-only MVP. No remote, no deploy, no external services required for the demo. The product name, host and canonical URL live in one constant: `BRAND` in `src/lib/brand.ts` (rename there; everything user-facing derives from it).
 
@@ -22,7 +22,7 @@ npm run logos          # optional: fetch org favicons into public/logos (already
 npm run ingest         # optional: pull public RSS news and tag it to orgs
 npm run dev            # http://localhost:3000 → "Continue as demo user" (local demo, no wallet)
 ```
-Other scripts: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, `npm run db:reset`, `npm run screenshots` (needs a running server + Chrome; see `scripts/screenshots.ts`).
+Other scripts: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, `npm run db:reset`, `npm run screenshots` (demo data; needs a running server + Chrome; see `scripts/screenshots.ts`), `npm run screenshots:real` (a brand-new member on a base-seed + real-news database; starts its own server; see `scripts/screenshots-real.ts`).
 
 The default seed (`db:seed`, `setup`, `db:reset`) creates **no people and no content**: only the 53 public-fact organizations, the public news feeds and topic channels. Fictional demo people are only added by `npm run seed:demo`, which refuses to run with `NODE_ENV=production`.
 
@@ -33,20 +33,21 @@ The default seed (`db:seed`, `setup`, `db:reset`) creates **no people and no con
 - **Channels:** join/leave, channel feeds, trending ranking (recent-activity decay + membership).
 - **Profiles:** cover, avatar, headline @ org, location, proof badges (work email, LinkedIn, wallet; all **unverified placeholders**), track record (deals closed, intros made, helpful updates → reputation tier), mutual connections, Follow / Request intro, Updates / Replies / About tabs.
 - **Org pages:** logo header with an "Unverified org" pill (no org verification yet), Follow, **Add to my deals**, tabs for updates mentioning the org, people at the org, news signals, public facts, and your private deal panel.
-- **Warm intros:** "Request intro" on a profile → pick a mutual connection → give a reason → the scout drafts the ask (editable) → send. The connector accepts (with a forwarded note) or declines; the requester can withdraw. `/intros` has Inbox / Sent / Made tabs with statuses; accepted intros count toward the connector's reputation.
+- **Warm intros:** "Request intro" on a profile → pick a mutual connection → give a reason → the scout drafts the ask (editable) → send. The connector accepts (with a forwarded note) or declines; the requester can withdraw. `/intros` has Inbox / Sent / Made tabs with statuses; accepted warm intros count toward the connector's reputation.
+- **Asks and offers:** topic (focus tag), region, expiry (7–90 days, default 30). The author can edit, mark filled, close and reopen; only open, unexpired, unhidden posts are listed. "Request intro" on a post uses a mutual connection when one exists, otherwise sends a **direct request** to the author with a short reason; accepting it connects the two members. Members can **report** a post; admins hide or dismiss reports in `/admin?tab=reports` (hidden posts stay visible to their author with a note).
 - **My deals (private):** the kanban pipeline from v1 (stage gates, due dates, competing chains, contacts, advisors, activity log, AI scout drafts). Only the count of committed deals shows publicly in the track record.
 - **Organization directory:** 53 real organizations with **public facts only** (name, type, HQ country, website, aliases); unknown fields left empty.
 - **Signals:** RSS ingestion from public feeds (CoinDesk, The Block, Decrypt, Ledger Insights, Finextra, CriptoNoticias) + manual signals, auto-tagged to orgs.
-- **Auth (local stub):** magic link shown on screen; one-click demo login in dev (or `ALLOW_DEV_LOGIN=1` with `next start`).
+- **Auth:** Mera passkey wallets (see below); one-click demo login only in dev (or `ALLOW_DEV_LOGIN=1` with `next start`).
 - **Bilingual:** EN/ES for every UI string (parity tested).
-- **Design:** high-contrast dark theme, one violet accent, Inter (self-hosted), initials avatars, favicon logos with initials fallback, empty states, a shimmer skeleton while AI drafts, small motion on likes/menus.
+- **Design:** light theme with a light-purple accent, Inter (self-hosted), uploaded profile photos with initials avatars as fallback, favicon logos with initials fallback, guided empty states, small motion on likes/menus.
 
 ### Demo content (clearly labelled)
 `npm run seed:demo` adds 8 **fictional** people at fictional companies (Quetzal Rails, Banco Meridiano, Harbor Asset Management, …), their updates, channels, intros, and asks/offers. Every demo account carries a **Demo** badge and a profile note. No real people are impersonated; real organizations only appear as `$tags` in questions and opinions, and real org pages show no people until someone verifies.
 
 ## What's mocked / not done
-- No real email delivery (magic link shown on screen). No real verification: work email, LinkedIn, wallet and org verification are placeholders shown as "unverified".
-- Intros never leave the app (no email/DM). The connector side is exercised with demo data; you can only log in as the demo user locally.
+- Work email and LinkedIn verification are placeholders shown as "unverified". Wallets are verified by Mera passkey signature; organization membership by admin-approved claims.
+- Intros never leave the app (no email/DM, no notifications beyond the Intros badge).
 - AI scout uses a deterministic template provider unless an API key is set; real providers are wired but untested against live APIs here.
 - No contact enrichment, job-post / RWA.xyz / onchain data sources yet. RSS tagging is name matching, not entity resolution.
 - Single-user workspaces (no team sharing / roles yet). No notifications beyond the Intros badge. No DMs.

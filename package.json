@@ -17,6 +17,7 @@
     "setup": "prisma db push && tsx prisma/seed.ts",
     "postinstall": "prisma generate",
     "screenshots": "tsx scripts/screenshots.ts",
+    "screenshots:real": "tsx scripts/screenshots-real.ts",
     "logos": "tsx scripts/fetch-logos.ts"
   },
   "dependencies": {

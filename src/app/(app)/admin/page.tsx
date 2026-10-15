@@ -12,6 +12,7 @@ import { getLocale, requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ORG_TYPE_LABELS, t, type Locale } from "@/lib/i18n";
 import { linkLabel } from "@/lib/links";
+import { avatarUrl } from "@/lib/media";
 import { isReportReason } from "@/lib/opportunities";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +25,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const locale = await getLocale();
   const raw = (await searchParams).tab;
   const tab: Tab = raw === "orgs" || raw === "reports" ? raw : "claims";
-  const userSel = { id: true, name: true, handle: true, headline: true, walletVerified: true, walletAddress: true } as const;
+  const userSel = { id: true, name: true, handle: true, headline: true, avatarKey: true, walletVerified: true, walletAddress: true } as const;
   const [claims, requests, counts] = await Promise.all([
     tab === "claims"
       ? prisma.orgClaim.findMany({ where: { status: "pending" }, include: { user: { select: userSel }, org: { select: { name: true, slug: true, website: true } } }, orderBy: { createdAt: "asc" } })
@@ -70,7 +71,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             {claims.map((c) => (
               <li key={c.id} className="glass p-4">
                 <div className="flex items-start gap-3">
-                  <UserAvatar name={c.user.name} seed={c.user.handle} size={44} />
+                  <UserAvatar name={c.user.name} seed={c.user.handle} src={avatarUrl(c.user.avatarKey)} size={44} />
                   <div className="min-w-0 flex-1">
                     <p className="text-[15px] font-semibold leading-snug">
                       <Link href={`/u/${c.user.handle}`} className="hover:underline">{c.user.name}</Link>
@@ -82,7 +83,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                   </div>
                 </div>
                 <dl className="mt-3 space-y-1.5 rounded-2xl bg-raised/70 p-3 text-[13px]">
-                  <Row label={t(locale, "claims.title")} value={c.title || "—"} />
+                  <Row label={t(locale, "admin.role")} value={c.title || "—"} />
                   <Row
                     label={t(locale, "claims.evidence")}
                     value={c.evidenceUrl ? <a href={c.evidenceUrl} target="_blank" rel="noreferrer nofollow" className="inline-flex items-center gap-1 text-accent hover:underline">{linkLabel(c.evidenceUrl)} <ExternalLink size={11} /></a> : "—"}

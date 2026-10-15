@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { BadgeCheck, ExternalLink, Lock, MapPin, Newspaper, Plus, ShieldQuestion, Users } from "lucide-react";
 import { addToPipelineAction, toggleFollowOrgAction } from "@/app/actions";
 import { OrgLogo, UserAvatar } from "@/components/avatar";
+import { avatarUrl } from "@/lib/media";
 import { ClaimPanel } from "@/components/claim-panel";
 import { DemoBadge } from "@/components/badges";
 import { OrgFacts, PrivateDealPanel } from "@/components/deal-panel";
@@ -40,7 +41,7 @@ export default async function OrgPage({
       followers: { where: { userId: user.id } },
       claims: {
         where: { status: "approved" },
-        include: { user: { select: { id: true, name: true, handle: true, headline: true, isDemo: true, walletVerified: true, walletAddress: true } } },
+        include: { user: { select: { id: true, name: true, handle: true, headline: true, isDemo: true, avatarKey: true, walletVerified: true, walletAddress: true } } },
         orderBy: { decidedAt: "asc" },
       },
       _count: { select: { followers: true, posts: true, signals: true } },
@@ -150,7 +151,7 @@ export default async function OrgPage({
               {verifiedMembers.map(({ user: m, title }) => (
                 <li key={m.id} className="border-b border-line px-4 py-3">
                   <Link href={`/u/${m.handle}`} className="flex items-center gap-3">
-                    <UserAvatar name={m.name} seed={m.handle} size={44} />
+                    <UserAvatar name={m.name} seed={m.handle} src={avatarUrl(m.avatarKey)} size={44} />
                     <span className="min-w-0">
                       <span className="flex items-center gap-1.5 font-semibold">{m.name} {m.isDemo && <DemoBadge locale={locale} />}</span>
                       <span className="block truncate text-sm text-faint">{title || m.headline}</span>

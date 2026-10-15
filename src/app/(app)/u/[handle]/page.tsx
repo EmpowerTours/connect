@@ -43,7 +43,7 @@ export default async function ProfilePage({
   const tab = sp.tab === "replies" ? "replies" : sp.tab === "about" ? "about" : "posts";
   const [graph, record, ctx] = await Promise.all([getGraph(me.id, user.id), getTrackRecord(user.id), getPostCtx(me, locale)]);
   const mutualUsers = graph.mutualIds.length
-    ? await prisma.user.findMany({ where: { id: { in: graph.mutualIds } }, select: { id: true, name: true, handle: true, isDemo: true, headline: true, orgName: true } })
+    ? await prisma.user.findMany({ where: { id: { in: graph.mutualIds } }, select: { id: true, name: true, handle: true, isDemo: true, headline: true, orgName: true, avatarKey: true } })
     : [];
   const items = tab === "about" ? [] : await getUserFeed(me.id, user.id, tab);
   const verified = user.workEmailVerified || user.linkedinVerified || user.walletVerified;
@@ -140,7 +140,7 @@ export default async function ProfilePage({
             {!isMe && mutualUsers.length > 0 && (
               <div className="mt-3 flex items-center gap-2">
                 <span className="flex -space-x-2">
-                  {mutualUsers.slice(0, 3).map((m) => <UserAvatar key={m.id} name={m.name} seed={m.handle} size={24} ring />)}
+                  {mutualUsers.slice(0, 3).map((m) => <UserAvatar key={m.id} name={m.name} seed={m.handle} src={avatarUrl(m.avatarKey)} size={24} ring />)}
                 </span>
                 <p className="text-[13px] text-faint">
                   {t(locale, "profile.mutualWith")} {mutualUsers.slice(0, 2).map((m) => m.name.split(" ")[0]).join(", ")}
@@ -197,7 +197,7 @@ export default async function ProfilePage({
                   {mutualUsers.map((m) => (
                     <li key={m.id}>
                       <Link href={`/u/${m.handle}`} className="flex items-center gap-2.5">
-                        <UserAvatar name={m.name} seed={m.handle} size={32} />
+                        <UserAvatar name={m.name} seed={m.handle} src={avatarUrl(m.avatarKey)} size={32} />
                         <span className="font-medium">{m.name}</span>
                         <span className="truncate text-sm text-faint">{[m.headline, m.orgName].filter(Boolean).join(" @ ")}</span>
                       </Link>

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { UserAvatar } from "@/components/avatar";
+import { avatarUrl } from "@/lib/media";
 import { Composer } from "@/components/composer";
 import { Columns, PageHeader } from "@/components/layout";
 import { PostCard } from "@/components/post-card";
@@ -47,7 +48,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
         <div className="h-3" />
       </div>
       <div id="reply" className="border-b border-line">
-        <Composer locale={locale} channels={ctx.channels} parentId={post.id} author={<UserAvatar name={user.name} seed={user.handle} size={42} />} />
+        <Composer locale={locale} channels={ctx.channels} parentId={post.id} author={<UserAvatar name={user.name} seed={user.handle} src={avatarUrl(user.avatarKey)} size={42} />} />
       </div>
       {replies.map(({ post: r, depth }) => (
         <div key={r.id} className="border-b border-line">

@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { ArrowUpRight, ChevronRight, KanbanSquare, Sparkles } from "lucide-react";
+import { ArrowUpRight, Check, ChevronRight, Clock3, KanbanSquare, Sparkles } from "lucide-react";
 import { OrgLogo, UserAvatar } from "@/components/avatar";
+import { avatarUrl } from "@/lib/media";
 import { DemoBadge } from "@/components/badges";
 import { Greeting } from "@/components/greeting";
 import { TabPage } from "@/components/layout";
@@ -8,22 +9,26 @@ import { TopLine } from "@/components/shell";
 import { timeAgo } from "@/components/time";
 import { getLocale, getWorkspace, requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { t } from "@/lib/i18n";
+import { t, type Locale } from "@/lib/i18n";
+import { connectionsOf } from "@/lib/intros";
+import { onboardingChecklist, profileComplete, type ChecklistKey } from "@/lib/onboarding";
 import { needsAttention } from "@/lib/pipeline";
 import { firstName, pickInsight } from "@/lib/today";
 
 export const dynamic = "force-dynamic";
 
-export default async function TodayPage() {
+export default async function TodayPage({ searchParams }: { searchParams: Promise<{ welcome?: string }> }) {
   const user = await requireUser();
   const locale = await getLocale();
   const now = new Date();
   const ws = await getWorkspace(user.id);
-  const since = new Date(now.getTime() - 7 * 86_400_000);
-  const [requests, deals, follows, signals] = await Promise.all([
+  const welcome = (await searchParams).welcome === "1";
+  // Hero: the busiest org in public news this week, falling back to the last 30 days for quiet weeks.
+  const since = new Date(now.getTime() - 30 * 86_400_000);
+  const [requests, deals, follows, signals, claims, myOpps, edges] = await Promise.all([
     prisma.intro.findMany({
       where: { connectorId: user.id, status: "pending" },
-      include: { requester: true, target: true },
+      include: { requester: true, target: true, opportunity: { select: { kind: true } } },
       orderBy: { createdAt: "desc" },
     }),
     prisma.deal.findMany({ where: { workspaceId: ws.id }, include: { org: { select: { name: true, slug: true } } } }),
@@ -32,17 +37,26 @@ export default async function TodayPage() {
       where: { publishedAt: { gte: since }, orgs: { some: {} } },
       include: { orgs: { include: { org: { select: { slug: true, name: true } } } } },
       orderBy: { publishedAt: "desc" },
-      take: 200,
+      take: 300,
     }),
+    prisma.orgClaim.findMany({ where: { userId: user.id, status: { in: ["pending", "approved"] } }, select: { status: true } }),
+    prisma.opportunity.count({ where: { authorId: user.id } }),
+    prisma.followUser.findMany({ where: { OR: [{ followerId: user.id }, { followeeId: user.id }] }, select: { followerId: true, followeeId: true } }),
   ]);
-  const priority = new Set([...deals.map((d) => d.org.slug), ...follows.map((f) => f.org.slug)]);
-  const insight = pickInsight(
-    signals
-      .filter((s) => (locale === "en" ? !/\(ES\)$/.test(s.sourceName) : true))
-      .flatMap((s) => s.orgs.map((o) => ({ orgSlug: o.org.slug, orgName: o.org.name, title: s.title, sourceName: s.sourceName, url: s.url, publishedAt: s.publishedAt }))),
-    priority,
-    now,
-  );
+  const myOrg = user.orgId ? await prisma.organization.findUnique({ where: { id: user.orgId }, select: { slug: true } }) : null;
+  const priority = new Set([...deals.map((d) => d.org.slug), ...follows.map((f) => f.org.slug), ...(myOrg ? [myOrg.slug] : [])]);
+  const insightSignals = signals
+    .filter((s) => (locale === "en" ? !/\(ES\)$/.test(s.sourceName) : true))
+    .flatMap((s) => s.orgs.map((o) => ({ orgSlug: o.org.slug, orgName: o.org.name, title: s.title, sourceName: s.sourceName, url: s.url, publishedAt: s.publishedAt })));
+  const insight = pickInsight(insightSignals, priority, now, 7) ?? pickInsight(insightSignals, priority, now, 30);
+  const checklist = onboardingChecklist({
+    profileComplete: profileComplete(user),
+    claimStatus: claims.some((c) => c.status === "approved") ? "approved" : claims.length ? "pending" : "none",
+    opportunities: myOpps,
+    connections: connectionsOf(edges, user.id).size,
+  });
+  const showChecklist = !user.isDemo && !checklist.complete;
+  const claimHref = myOrg ? `/orgs/${myOrg.slug}?tab=people` : "/orgs";
   const attention = needsAttention(deals, now).length;
   const user1 = { name: user.name, handle: user.handle, isDemo: user.isDemo, avatarKey: user.avatarKey };
 
@@ -51,7 +65,7 @@ export default async function TodayPage() {
       <TopLine eyebrow={t(locale, "nav.today")} user={user1} />
       <div className="mt-3 animate-rise">
         <Greeting name={firstName(user.name)} locale={locale} serverHour={now.getHours()} />
-        <p className="mt-3 text-[15px] text-muted">{t(locale, "today.attention")}</p>
+        <p className="mt-3 text-[15px] text-muted">{t(locale, welcome ? "today.welcome" : showChecklist ? "today.newHere" : "today.attention")}</p>
       </div>
 
       {/* Hero insight */}
@@ -99,7 +113,35 @@ export default async function TodayPage() {
         </div>
       )}
 
+      {showChecklist && (
+        <section className="mt-9" aria-labelledby="getting-started">
+          <div className="mb-3 flex items-baseline justify-between px-1">
+            <h2 id="getting-started" className="text-[17px] font-semibold tracking-tight">{t(locale, "today.getStarted")}</h2>
+            <span className="text-[13px] font-semibold text-accent-ink">{t(locale, "today.progress").replace("{done}", String(checklist.done)).replace("{total}", String(checklist.total))}</span>
+          </div>
+          <div className="glass overflow-hidden rounded-[24px]! p-1.5">
+            <div className="mx-3.5 mb-1 mt-2.5 h-1.5 overflow-hidden rounded-full bg-lavender/70">
+              <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${Math.max(4, (checklist.done / checklist.total) * 100)}%` }} />
+            </div>
+            <ul>
+              {checklist.items.map((item) => (
+                <li key={item.key}>
+                  <ChecklistRow
+                    item={item.key}
+                    done={item.done}
+                    pending={!!item.pending}
+                    href={item.key === "claim" ? claimHref : item.href}
+                    locale={locale}
+                  />
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      )}
+
       {/* Intro requests waiting on you */}
+      {(requests.length > 0 || !showChecklist) && (
       <section className="mt-9">
         <div className="mb-3 flex items-baseline justify-between px-1">
           <h2 className="text-[17px] font-semibold tracking-tight">
@@ -116,7 +158,7 @@ export default async function TodayPage() {
               <li key={r.id}>
                 <Link href="/intros" className="glass flex items-center gap-3.5 rounded-[22px]! px-4 py-3.5 transition hover:bg-white/90 active:scale-[0.99]">
                   <span className="relative">
-                    <UserAvatar name={r.requester.name} seed={r.requester.handle} size={46} />
+                    <UserAvatar name={r.requester.name} seed={r.requester.handle} src={avatarUrl(r.requester.avatarKey)} size={46} />
                     <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-accent ring-2 ring-white" />
                   </span>
                   <span className="min-w-0 flex-1">
@@ -126,7 +168,9 @@ export default async function TodayPage() {
                     </span>
                     <span className="block truncate text-[13px] text-faint">{[r.requester.headline, r.requester.orgName].filter(Boolean).join(", ")}</span>
                     <span className="mt-0.5 block truncate text-[12.5px] font-medium text-accent-ink">
-                      {t(locale, "today.wantsIntro")} {t(locale, "today.toTarget").replace("{name}", firstName(r.target.name))}
+                      {r.mode === "direct"
+                        ? t(locale, r.opportunity?.kind === "offer" ? "today.aboutYourOffer" : "today.aboutYourAsk")
+                        : `${t(locale, "today.wantsIntro")} ${t(locale, "today.toTarget").replace("{name}", firstName(r.target.name))}`}
                     </span>
                   </span>
                   <ChevronRight size={18} className="shrink-0 text-faint" />
@@ -136,6 +180,7 @@ export default async function TodayPage() {
           </ul>
         )}
       </section>
+      )}
 
       {attention > 0 && (
         <section className="mt-8">
@@ -154,5 +199,33 @@ export default async function TodayPage() {
       )}
       <p className="mt-8 px-1 text-center text-[11.5px] text-faint">{t(locale, "today.publicNews")}</p>
     </TabPage>
+  );
+}
+
+const CHECK_ICON_BG = "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full";
+
+function ChecklistRow({ item, done, pending, href, locale }: { item: ChecklistKey; done: boolean; pending: boolean; href: string; locale: Locale }) {
+  const body = (
+    <>
+      {done ? (
+        <span className={`${CHECK_ICON_BG} bg-accent text-white`}><Check size={17} strokeWidth={2.6} /></span>
+      ) : pending ? (
+        <span className={`${CHECK_ICON_BG} bg-amber-100 text-amber-700`}><Clock3 size={17} /></span>
+      ) : (
+        <span className={`${CHECK_ICON_BG} border-2 border-dashed border-lilac bg-white/70`} />
+      )}
+      <span className="min-w-0 flex-1">
+        <span className={`block text-[15px] font-semibold ${done ? "text-faint line-through decoration-lilac" : ""}`}>{t(locale, `today.check.${item}`)}</span>
+        <span className="block truncate text-[13px] text-faint">
+          {pending ? t(locale, "today.check.claimPending") : t(locale, `today.check.${item}Hint`)}
+        </span>
+      </span>
+      {!done && !pending && <ChevronRight size={18} className="shrink-0 text-faint" />}
+    </>
+  );
+  return done || pending ? (
+    <div className="flex items-center gap-3.5 rounded-[18px] px-3.5 py-3">{body}</div>
+  ) : (
+    <Link href={href} className="flex items-center gap-3.5 rounded-[18px] px-3.5 py-3 transition hover:bg-white/80 active:scale-[0.99]">{body}</Link>
   );
 }

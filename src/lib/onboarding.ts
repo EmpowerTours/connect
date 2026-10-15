@@ -116,10 +116,10 @@ export interface ChecklistItem {
 /** Today's "get started" checklist for a new member. */
 export function onboardingChecklist(s: ChecklistState): { items: ChecklistItem[]; done: number; total: number; complete: boolean } {
   const items: ChecklistItem[] = [
-    { key: "profile", done: s.profileComplete, href: "/welcome?step=you" },
+    { key: "profile", done: s.profileComplete, href: "/profile" },
     { key: "claim", done: s.claimStatus === "approved", pending: s.claimStatus === "pending", href: "/orgs" },
     { key: "ask", done: s.opportunities > 0, href: "/opportunities?new=1" },
-    { key: "connect", done: s.connections > 0, href: "/circle" },
+    { key: "connect", done: s.connections > 0, href: "/opportunities" },
   ];
   const done = items.filter((i) => i.done).length;
   return { items, done, total: items.length, complete: done === items.length };

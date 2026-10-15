@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Handshake, Inbox, Send } from "lucide-react";
 import { respondIntroAction, withdrawIntroAction } from "@/app/actions";
 import { UserAvatar } from "@/components/avatar";
+import { avatarUrl } from "@/lib/media";
 import { DemoBadge } from "@/components/badges";
 import { EmptyState } from "@/components/empty-state";
 import { Columns, PageHeader, Tabs } from "@/components/layout";
@@ -26,13 +27,13 @@ function StatusPill({ status, locale }: { status: string; locale: Locale }) {
   return <span className={`chip ${STATUS_STYLE[s] ?? ""}`}>{t(locale, `introStatus.${s}`)}</span>;
 }
 
-type P = { id: string; name: string; handle: string; isDemo: boolean; headline: string; orgName: string };
-const pSel = { id: true, name: true, handle: true, isDemo: true, headline: true, orgName: true } as const;
+type P = { id: string; name: string; handle: string; isDemo: boolean; headline: string; orgName: string; avatarKey: string | null };
+const pSel = { id: true, name: true, handle: true, isDemo: true, headline: true, orgName: true, avatarKey: true } as const;
 
 function Person({ p, locale, size = 36 }: { p: P; locale: Locale; size?: number }) {
   return (
     <Link href={`/u/${p.handle}`} className="flex min-w-0 items-center gap-2.5">
-      <UserAvatar name={p.name} seed={p.handle} size={size} />
+      <UserAvatar name={p.name} seed={p.handle} src={avatarUrl(p.avatarKey)} size={size} />
       <span className="min-w-0">
         <span className="flex items-center gap-1.5 text-[14px] font-semibold">
           <span className="truncate">{p.name}</span>
@@ -104,7 +105,7 @@ export default async function IntrosPage({ searchParams }: { searchParams: Promi
               <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-2xl border border-line bg-raised/60 p-3">
                 <Person p={i.requester} locale={locale} />
                 <span className="flex flex-col items-center px-1 text-faint">
-                  {!direct && <UserAvatar name={i.connector.name} seed={i.connector.handle} size={22} />}
+                  {!direct && <UserAvatar name={i.connector.name} seed={i.connector.handle} src={avatarUrl(i.connector.avatarKey)} size={22} />}
                   <ArrowRight size={14} className="mt-0.5" />
                 </span>
                 <Person p={i.target} locale={locale} />
