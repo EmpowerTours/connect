@@ -64,6 +64,24 @@ export default async function OrgPage({
   const following = org.followers.length > 0;
   const chainsInUse = parseList(org.chainsInUse);
   const chainsEval = parseList(org.chainsEvaluating);
+  const renderDraft = (d: (typeof drafts)[number]) => (
+                <article key={d.id} className="rounded-lg border border-line bg-bg p-3">
+                  <div className="mb-2 flex items-center justify-between text-xs text-zinc-500">
+                    <span>{d.provider} · {d.locale.toUpperCase()} · {timeAgo(d.createdAt, locale)}</span>
+                    <CopyButton text={`${d.subject}\n\n${d.draft}`} label={locale === "es" ? "Copiar" : "Copy"} done={locale === "es" ? "Copiado" : "Copied"} />
+                  </div>
+                  <h4 className="label">{t(locale, "scout.fit")}</h4>
+                  <p className="mb-3 text-sm text-zinc-300">{d.fit}</p>
+                  <h4 className="label">{t(locale, "scout.angles")}</h4>
+                  <ul className="mb-3 list-inside list-disc text-sm text-zinc-300">
+                    {parseList(d.angles).map((a) => <li key={a}>{a}</li>)}
+                  </ul>
+                  <h4 className="label">{t(locale, "scout.subject")}</h4>
+                  <p className="mb-3 text-sm font-medium">{d.subject}</p>
+                  <h4 className="label">{t(locale, "scout.draft")}</h4>
+                  <pre className="whitespace-pre-wrap rounded-md bg-panel p-3 font-sans text-sm text-zinc-200">{d.draft}</pre>
+                </article>
+  );
   const unknown = <span className="text-zinc-600">{t(locale, "org.unknown")}</span>;
 
   return (
@@ -297,24 +315,13 @@ export default async function OrgPage({
             {providerName === "mock" && <p className="mt-2 text-xs text-zinc-500">{t(locale, "scout.mockNote")}</p>}
             <div className="mt-4 space-y-4">
               {drafts.length === 0 && <p className="text-sm text-zinc-600">{t(locale, "scout.empty")}</p>}
-              {drafts.map((d, i) => (
-                <article key={d.id} className={`rounded-lg border border-line bg-bg p-3 ${i > 0 ? "opacity-70" : ""}`}>
-                  <div className="mb-2 flex items-center justify-between text-xs text-zinc-500">
-                    <span>{d.provider} · {d.locale.toUpperCase()} · {timeAgo(d.createdAt, locale)}</span>
-                    <CopyButton text={`${d.subject}\n\n${d.draft}`} label={locale === "es" ? "Copiar" : "Copy"} done={locale === "es" ? "Copiado" : "Copied"} />
-                  </div>
-                  <h4 className="label">{t(locale, "scout.fit")}</h4>
-                  <p className="mb-3 text-sm text-zinc-300">{d.fit}</p>
-                  <h4 className="label">{t(locale, "scout.angles")}</h4>
-                  <ul className="mb-3 list-inside list-disc text-sm text-zinc-300">
-                    {parseList(d.angles).map((a) => <li key={a}>{a}</li>)}
-                  </ul>
-                  <h4 className="label">{t(locale, "scout.subject")}</h4>
-                  <p className="mb-3 text-sm font-medium">{d.subject}</p>
-                  <h4 className="label">{t(locale, "scout.draft")}</h4>
-                  <pre className="whitespace-pre-wrap rounded-md bg-panel p-3 font-sans text-sm text-zinc-200">{d.draft}</pre>
-                </article>
-              ))}
+              {drafts.slice(0, 1).map((d) => renderDraft(d))}
+              {drafts.length > 1 && (
+                <details>
+                  <summary className="cursor-pointer text-xs text-zinc-500">{locale === "es" ? "Borradores anteriores" : "Earlier drafts"} ({drafts.length - 1})</summary>
+                  <div className="mt-3 space-y-3 opacity-70">{drafts.slice(1).map((d) => renderDraft(d))}</div>
+                </details>
+              )}
             </div>
           </Section>
 

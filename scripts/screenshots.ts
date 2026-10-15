@@ -38,6 +38,7 @@ async function main() {
   await page.goto(`${BASE}/orgs/bitso`);
   await page.getByRole("button", { name: /Generate fit|Generar encaje/ }).click();
   await page.getByText(/Draft outreach|Borrador de contacto/).first().waitFor();
+  await page.getByRole("button", { name: /Generate fit|Generar encaje/ }).waitFor(); // pending state cleared
   await page.screenshot({ path: path.join(OUT, "bdnet-org-ai-draft.png"), fullPage: true });
 
   await page.goto(`${BASE}/feed?tab=signals&scope=all`);
