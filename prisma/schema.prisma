@@ -63,6 +63,53 @@ model User {
   following    FollowUser[] @relation("Follower")
   followers    FollowUser[] @relation("Followee")
   opportunities      Opportunity[]
+  orgClaims          OrgClaim[]
+  orgRequests        OrgRequest[]
+}
+
+/// A user's claim to work at an organization. Pending until an admin
+/// (ADMIN_WALLETS) approves it; only approved claims count as verified members.
+model OrgClaim {
+  id           String       @id @default(cuid())
+  userId       String
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orgId        String
+  org          Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  title        String       @default("")
+  evidenceUrl  String       @default("")
+  note         String       @default("")
+  /// pending | approved | rejected | withdrawn | revoked
+  status       String       @default("pending")
+  decidedAt    DateTime?
+  /// Lowercased wallet of the admin who decided.
+  decidedBy    String?
+  decisionNote String       @default("")
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@unique([userId, orgId])
+  @@index([orgId, status])
+  @@index([status, createdAt])
+}
+
+/// A user's request to add an organization that is not in the directory yet.
+model OrgRequest {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  website      String    @default("")
+  type         String    @default("")
+  note         String    @default("")
+  /// pending | approved | rejected
+  status       String    @default("pending")
+  /// The organization created on approval.
+  orgId        String?
+  decidedAt    DateTime?
+  decidedBy    String?
+  createdAt    DateTime  @default(now())
+
+  @@index([status, createdAt])
 }
 
 model Session {
@@ -109,6 +156,7 @@ model Organization {
   drafts    ScoutDraft[]
   advisingOn Advisor[]
   opportunities Opportunity[]
+  claims        OrgClaim[]
 }
 
 model Workspace {

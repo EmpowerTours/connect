@@ -95,3 +95,6 @@ Linked wallets show a **Verified on Monad** badge on the profile. All write acti
 **Local demo login** ("Continue as demo user") still works without any Mera config. It is a separate DB-backed cookie, only honoured when `NODE_ENV !== "production"` or `ALLOW_DEV_LOGIN=1`.
 
 Config for real Mera sign-in (see `.env.example`): `AUTH_SESSION_SECRET` (≥ 32 random chars), `NEXT_PUBLIC_RP_ID` (`empowertours.xyz` in production, the shared parent; per-host values like `connect.empowertours.xyz` are refused because they would mint a different wallet), `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` (required in production). Passkeys need HTTPS (or `localhost`) and a PRF-capable authenticator.
+
+## Organizations: claims and admin review
+A passkey-verified member can **claim membership** of an organization (role, optional evidence link, note) from the org's People tab, or **request a new organization** that isn't listed. Claims stay **pending** until an admin approves them; only approved claims count as **verified members** on org pages. Admins are the wallets listed in `ADMIN_WALLETS`, signed in with a Mera passkey (the local demo login is never an admin); `/admin` is a 404 for everyone else. Org pages state that listing is based on public information and does not imply the organization endorses Connect.

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { BadgeCheck, ExternalLink, Lock, MapPin, Newspaper, Plus, ShieldQuestion, Users } from "lucide-react";
 import { addToPipelineAction, toggleFollowOrgAction } from "@/app/actions";
 import { OrgLogo, UserAvatar } from "@/components/avatar";
+import { ClaimPanel } from "@/components/claim-panel";
 import { DemoBadge } from "@/components/badges";
 import { OrgFacts, PrivateDealPanel } from "@/components/deal-panel";
 import { EmptyState } from "@/components/empty-state";
@@ -21,7 +22,13 @@ import { getScoutProvider } from "@/lib/scout";
 
 export const dynamic = "force-dynamic";
 
-export default async function OrgPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ tab?: string; scoutError?: string }> }) {
+export default async function OrgPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ tab?: string; scoutError?: string; claim?: string; claimError?: string }>;
+}) {
   const { slug } = await params;
   const sp = await searchParams;
   const user = await requireUser();
@@ -31,11 +38,17 @@ export default async function OrgPage({ params, searchParams }: { params: Promis
     where: { slug },
     include: {
       followers: { where: { userId: user.id } },
-      members: { select: { id: true, name: true, handle: true, headline: true, isDemo: true } },
+      claims: {
+        where: { status: "approved" },
+        include: { user: { select: { id: true, name: true, handle: true, headline: true, isDemo: true, walletVerified: true, walletAddress: true } } },
+        orderBy: { decidedAt: "asc" },
+      },
       _count: { select: { followers: true, posts: true, signals: true } },
     },
   });
   if (!org) notFound();
+  const myClaim = await prisma.orgClaim.findUnique({ where: { userId_orgId: { userId: user.id, orgId: org.id } } });
+  const verifiedMembers = org.claims;
   const deal = await prisma.deal.findUnique({
     where: { workspaceId_orgId: { workspaceId: ws.id, orgId: org.id } },
     include: {
@@ -110,9 +123,10 @@ export default async function OrgPage({ params, searchParams }: { params: Promis
           )}
           <p className="mt-2.5 flex flex-wrap gap-x-4 text-[15px]">
             <span><b>{org._count.followers}</b> <span className="text-faint">{t(locale, "profile.followers")}</span></span>
-            <span><b>{org.members.length}</b> <span className="text-faint">{t(locale, "org.people")}</span></span>
+            <span title={t(locale, "claims.countHint")}><b>{verifiedMembers.length}</b> <span className="text-faint">{t(locale, "claims.verifiedMembers")}</span></span>
             <span><b>{org._count.posts}</b> <span className="text-faint">{t(locale, "org.mentions")}</span></span>
           </p>
+          <p className="mt-3 rounded-xl bg-raised/70 px-3 py-2 text-[12px] leading-snug text-faint">{t(locale, "org.disclaimer").replace("{org}", org.name)}</p>
         </div>
         <Tabs
           tabs={[
@@ -128,24 +142,29 @@ export default async function OrgPage({ params, searchParams }: { params: Promis
       {tab === "posts" &&
         (items.length ? items.map((item) => <PostCard key={item.key} item={item} ctx={ctx} />) : <EmptyState icon={Newspaper} title={t(locale, "org.noPostsTitle")} body={t(locale, "org.noPostsBody").replace("{slug}", org.slug)} />)}
 
-      {tab === "people" &&
-        (org.members.length ? (
-          <ul>
-            {org.members.map((m) => (
-              <li key={m.id} className="border-b border-line px-4 py-3">
-                <Link href={`/u/${m.handle}`} className="flex items-center gap-3">
-                  <UserAvatar name={m.name} seed={m.handle} size={44} />
-                  <span>
-                    <span className="flex items-center gap-1.5 font-semibold">{m.name} {m.isDemo && <DemoBadge locale={locale} />}</span>
-                    <span className="block text-sm text-faint">{m.headline}</span>
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <EmptyState icon={Users} title={t(locale, "org.noPeopleTitle")} body={t(locale, "org.noPeopleBody")} />
-        ))}
+      {tab === "people" && (
+        <div>
+          <ClaimPanel org={org} myClaim={myClaim} user={user} locale={locale} sent={sp.claim === "sent"} error={sp.claimError} />
+          {verifiedMembers.length ? (
+            <ul>
+              {verifiedMembers.map(({ user: m, title }) => (
+                <li key={m.id} className="border-b border-line px-4 py-3">
+                  <Link href={`/u/${m.handle}`} className="flex items-center gap-3">
+                    <UserAvatar name={m.name} seed={m.handle} size={44} />
+                    <span className="min-w-0">
+                      <span className="flex items-center gap-1.5 font-semibold">{m.name} {m.isDemo && <DemoBadge locale={locale} />}</span>
+                      <span className="block truncate text-sm text-faint">{title || m.headline}</span>
+                      <span className="mt-1 inline-flex items-center gap-1 text-[11.5px] font-semibold text-accent-ink"><BadgeCheck size={12} /> {t(locale, "claims.verifiedMember")}</span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <EmptyState icon={Users} title={t(locale, "org.noPeopleTitle")} body={t(locale, "claims.noMembersBody")} />
+          )}
+        </div>
+      )}
 
       {tab === "news" &&
         (signals.length ? (

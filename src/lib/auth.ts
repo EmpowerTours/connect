@@ -1,7 +1,8 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { isAdmin } from "./admin";
 import { prisma } from "./db";
 import { SESSION_TTL_MS, devLoginAllowed, handleFromEmail, normalizeEmail } from "./auth-core";
 import { BRAND } from "./brand";
@@ -73,6 +74,19 @@ export async function requireUser() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   return user;
+}
+
+/** Admin = Mera session for a wallet in ADMIN_WALLETS. Everyone else gets a 404. */
+export async function requireAdmin() {
+  const auth = await getCurrentAuth();
+  if (!auth) redirect("/login");
+  if (!isAdmin(auth.user, auth.method)) notFound();
+  return auth.user;
+}
+
+export async function currentUserIsAdmin(): Promise<boolean> {
+  const auth = await getCurrentAuth();
+  return !!auth && isAdmin(auth.user, auth.method);
 }
 
 export async function getLocale(): Promise<Locale> {

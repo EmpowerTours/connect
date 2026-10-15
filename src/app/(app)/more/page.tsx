@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { ChevronRight, Hash, Handshake, KanbanSquare, Landmark, Languages, Lock, LogOut, Newspaper, PenLine, Radio } from "lucide-react";
+import { ChevronRight, Hash, ShieldCheck, Handshake, KanbanSquare, Landmark, Languages, Lock, LogOut, Newspaper, PenLine, Radio } from "lucide-react";
 import { logoutAction, setLocaleAction } from "@/app/actions";
 import { UserAvatar } from "@/components/avatar";
 import { DemoBadge } from "@/components/badges";
 import { TabPage } from "@/components/layout";
-import { getLocale, requireUser } from "@/lib/auth";
+import { currentUserIsAdmin, getLocale, requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { t } from "@/lib/i18n";
 
@@ -36,6 +36,7 @@ export default async function MorePage() {
       ],
     },
   ];
+  if (await currentUserIsAdmin()) groups.push({ title: t(locale, "admin.eyebrow"), items: [{ href: "/admin", label: t(locale, "admin.title"), Icon: ShieldCheck }] });
   return (
     <TabPage>
       <p className="eyebrow flex h-10 items-center">{t(locale, "nav.more")}</p>
