@@ -57,7 +57,7 @@ export default async function OpportunitiesPage({ searchParams }: { searchParams
     <TabPage>
       <TopLine
         eyebrow={t(locale, "nav.opportunities")}
-        user={{ name: user.name, handle: user.handle, isDemo: user.isDemo }}
+        user={{ name: user.name, handle: user.handle, isDemo: user.isDemo, avatarKey: user.avatarKey }}
         right={
           <Link
             href={`${base}${base.includes("?") ? "&" : "?"}new=1`}

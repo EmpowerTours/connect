@@ -43,6 +43,16 @@ model User {
   walletVerifiedAt   DateTime?
   /// WebAuthn credential id of the Mera passkey (base64url). Informational.
   passkeyCredentialId String?
+  /// Set when the onboarding flow is finished (real users only).
+  onboardedAt        DateTime?
+  region             String   @default("")
+  /// JSON list of FOCUS_TAGS (src/lib/onboarding.ts).
+  focusTags          String   @default("[]")
+  /// Storage key of the profile photo (see src/lib/storage.ts), e.g. avatars/<id>.webp
+  avatarKey          String?
+  linkX              String   @default("")
+  linkLinkedin       String   @default("")
+  linkWebsite        String   @default("")
   createdAt          DateTime @default(now())
 
   likes            Like[]

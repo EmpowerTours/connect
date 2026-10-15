@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ChevronRight, Hash, ShieldCheck, Handshake, KanbanSquare, Landmark, Languages, Lock, LogOut, Newspaper, PenLine, Radio } from "lucide-react";
 import { logoutAction, setLocaleAction } from "@/app/actions";
 import { UserAvatar } from "@/components/avatar";
+import { avatarUrl } from "@/lib/media";
 import { DemoBadge } from "@/components/badges";
 import { TabPage } from "@/components/layout";
 import { currentUserIsAdmin, getLocale, requireUser } from "@/lib/auth";
@@ -41,7 +42,7 @@ export default async function MorePage() {
     <TabPage>
       <p className="eyebrow flex h-10 items-center">{t(locale, "nav.more")}</p>
       <Link href={`/u/${user.handle}`} className="glass mt-2 flex items-center gap-4 p-4 transition hover:bg-white/90">
-        <UserAvatar name={user.name} seed={user.handle} size={56} />
+        <UserAvatar name={user.name} seed={user.handle} src={avatarUrl(user.avatarKey)} size={56} />
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1.5 text-[18px] font-semibold tracking-tight">
             <span className="truncate">{user.name}</span>

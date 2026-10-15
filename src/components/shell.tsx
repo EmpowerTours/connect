@@ -3,12 +3,14 @@ import { logoutAction, setLocaleAction } from "@/app/actions";
 import { APP_NAME } from "@/lib/constants";
 import { t, type Locale } from "@/lib/i18n";
 import { UserAvatar } from "./avatar";
+import { avatarUrl } from "@/lib/media";
 import { RailNav } from "./nav-items";
 
 export interface ShellUser {
   name: string;
   handle: string;
   isDemo: boolean;
+  avatarKey?: string | null;
 }
 
 export function LogoMark({ size = 30 }: { size?: number }) {
@@ -51,7 +53,7 @@ export function SideRail({ locale, user, pendingIntros }: { locale: Locale; user
           </form>
         </div>
         <Link href={`/u/${user.handle}`} className="flex items-center gap-3 rounded-2xl p-1.5 transition hover:bg-white/70">
-          <UserAvatar name={user.name} seed={user.handle} size={36} />
+          <UserAvatar name={user.name} seed={user.handle} src={avatarUrl(user.avatarKey)} size={36} />
           <span className="hidden min-w-0 lg:block">
             <span className="block truncate text-sm font-semibold">{user.name}</span>
             <span className="block truncate text-xs text-faint">@{user.handle}</span>
@@ -70,7 +72,7 @@ export function TopLine({ eyebrow, user, right }: { eyebrow: string; user: Shell
       <div className="flex items-center gap-2">
         {right}
         <Link href="/more" aria-label="Menu" className="rounded-full transition active:scale-95 md:hidden">
-          <UserAvatar name={user.name} seed={user.handle} size={34} ring />
+          <UserAvatar name={user.name} seed={user.handle} src={avatarUrl(user.avatarKey)} size={34} ring />
         </Link>
       </div>
     </div>

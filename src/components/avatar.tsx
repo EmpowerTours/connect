@@ -23,7 +23,20 @@ export function initials(name: string) {
 }
 
 /** Deterministic generated avatar: pastel tint per person + initials. */
-export function UserAvatar({ name, seed, size = 40, ring = false }: { name: string; seed?: string; size?: number; ring?: boolean }) {
+export function UserAvatar({ name, seed, size = 40, ring = false, src }: { name: string; seed?: string; size?: number; ring?: boolean; src?: string | null }) {
+  if (src) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- user uploads are already resized to 512px WebP
+      <img
+        src={src}
+        alt=""
+        width={size}
+        height={size}
+        className={`shrink-0 rounded-full bg-raised object-cover ${ring ? "ring-4 ring-white" : ""}`}
+        style={{ width: size, height: size }}
+      />
+    );
+  }
   const hue = hash(seed ?? name) % 360;
   return (
     <span

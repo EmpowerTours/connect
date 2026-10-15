@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CalendarDays, Check, Handshake, KanbanSquare, MapPin, MessageSquareText, Sparkles, UserPlus } from "lucide-react";
+import { AtSign, Briefcase, CalendarDays, Check, Globe, Handshake, KanbanSquare, MapPin, MessageSquareText, Sparkles, UserPlus } from "lucide-react";
 import { toggleFollowUserAction } from "@/app/actions";
 import { UserAvatar } from "@/components/avatar";
 import { DemoBadge, ProofBadges, VerifiedTick } from "@/components/badges";
@@ -12,7 +12,11 @@ import { PostCard } from "@/components/post-card";
 import { getLocale, requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getUserFeed } from "@/lib/feed";
-import { t } from "@/lib/i18n";
+import { REGION_LABELS, t } from "@/lib/i18n";
+import { parseList } from "@/lib/json";
+import { linkLabel } from "@/lib/links";
+import { avatarUrl } from "@/lib/media";
+import { isFocusTag } from "@/lib/onboarding";
 import { getPostCtx } from "@/lib/post-ctx";
 import { getGraph, getTrackRecord } from "@/lib/profile";
 
@@ -35,6 +39,7 @@ export default async function ProfilePage({
   });
   if (!user) notFound();
   const isMe = user.id === me.id;
+  const focusTags = parseList(user.focusTags).filter(isFocusTag);
   const tab = sp.tab === "replies" ? "replies" : sp.tab === "about" ? "about" : "posts";
   const [graph, record, ctx] = await Promise.all([getGraph(me.id, user.id), getTrackRecord(user.id), getPostCtx(me, locale)]);
   const mutualUsers = graph.mutualIds.length
@@ -58,7 +63,7 @@ export default async function ProfilePage({
         <div className="h-28 bg-[radial-gradient(120%_140%_at_0%_0%,rgb(124_92_255/0.55),transparent_55%),radial-gradient(120%_140%_at_100%_100%,rgb(124_92_255/0.25),transparent_60%)] sm:h-36" />
         <div className="px-4 pb-4">
           <div className="-mt-12 flex items-end justify-between gap-3 sm:-mt-14">
-            <UserAvatar name={user.name} seed={user.handle} size={96} ring />
+            <UserAvatar name={user.name} seed={user.handle} src={avatarUrl(user.avatarKey)} size={96} ring />
             <div className="flex flex-wrap justify-end gap-2 pb-1">
               {isMe ? (
                 <Link href="/profile" className="btn-secondary">{t(locale, "profile.edit")}</Link>
@@ -110,9 +115,23 @@ export default async function ProfilePage({
             {user.bio && <p className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-fg/90">{user.bio}</p>}
             {user.isDemo && <p className="mt-2 text-xs text-amber-800">{t(locale, "demo.profileNote")}</p>}
             <p className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-faint">
-              {user.location && <span className="inline-flex items-center gap-1"><MapPin size={14} />{user.location}</span>}
+              {(user.location || user.region) && (
+                <span className="inline-flex items-center gap-1"><MapPin size={14} />{user.location || REGION_LABELS[locale][user.region]}</span>
+              )}
               <span className="inline-flex items-center gap-1"><CalendarDays size={14} />{t(locale, "profile.joined")} {user.createdAt.toLocaleDateString(locale === "es" ? "es-MX" : "en-US", { month: "long", year: "numeric" })}</span>
             </p>
+            {(user.linkX || user.linkLinkedin || user.linkWebsite) && (
+              <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                {user.linkX && <a href={user.linkX} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1 text-accent hover:underline"><AtSign size={14} />{linkLabel(user.linkX).replace(/^x\.com\//, "")}</a>}
+                {user.linkLinkedin && <a href={user.linkLinkedin} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1 text-accent hover:underline"><Briefcase size={14} />LinkedIn</a>}
+                {user.linkWebsite && <a href={user.linkWebsite} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1 text-accent hover:underline"><Globe size={14} />{linkLabel(user.linkWebsite)}</a>}
+              </p>
+            )}
+            {focusTags.length > 0 && (
+              <div className="mt-2.5 flex flex-wrap gap-1.5" aria-label={t(locale, "profile.focus")}>
+                {focusTags.map((tag) => <span key={tag} className="chip">{t(locale, `focus.${tag}`)}</span>)}
+              </div>
+            )}
             <p className="mt-2.5 flex flex-wrap gap-x-4 text-[15px]">
               <span><b>{graph.connectionCount}</b> <span className="text-faint">{t(locale, "profile.connections")}</span></span>
               <span><b>{user._count.followers}</b> <span className="text-faint">{t(locale, "profile.followers")}</span></span>

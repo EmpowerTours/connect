@@ -44,7 +44,7 @@ export default async function TodayPage() {
     now,
   );
   const attention = needsAttention(deals, now).length;
-  const user1 = { name: user.name, handle: user.handle, isDemo: user.isDemo };
+  const user1 = { name: user.name, handle: user.handle, isDemo: user.isDemo, avatarKey: user.avatarKey };
 
   return (
     <TabPage>
