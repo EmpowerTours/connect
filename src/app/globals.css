@@ -2,19 +2,24 @@
 
 @theme {
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --color-bg: #09090b;
-  --color-surface: #111114;
-  --color-raised: #18181c;
-  --color-line: #26262c;
-  --color-line-strong: #34343c;
-  --color-fg: #fafafa;
-  --color-muted: #a1a1aa;
-  --color-faint: #71717a;
-  --color-accent: #7c5cff;
-  --color-accent-hover: #9177ff;
-  --color-accent-soft: rgb(124 92 255 / 0.14);
-  --color-danger: #f87171;
-  --color-success: #4ade80;
+  --color-bg: #f6f5f9;
+  --color-surface: #ffffff;
+  --color-raised: #f1eff6;
+  --color-line: #e8e5ef;
+  --color-line-strong: #d8d3e4;
+  --color-fg: #17151f;
+  --color-muted: #55506a;
+  --color-faint: #6b6680;
+  /* Light purple accent. #7c3aed passes AA for text and white-on-fill (5.7:1). */
+  --color-accent: #7c3aed;
+  --color-accent-hover: #6d28d9;
+  --color-accent-ink: #5b21b6;
+  --color-accent-soft: #ede9fe;
+  --color-lilac: #c4b5fd;
+  --color-lavender: #a78bfa;
+  --color-danger: #dc2626;
+  --color-success: #15803d;
+  --radius-card: 26px;
   --animate-shimmer: shimmer 1.4s linear infinite;
   --animate-pop: pop 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.4);
   --animate-fade-in: fade-in 0.18s ease-out;
@@ -39,9 +44,13 @@
   }
 }
 
-html { color-scheme: dark; -webkit-tap-highlight-color: transparent; }
+html { color-scheme: light; -webkit-tap-highlight-color: transparent; }
 body {
-  background: var(--color-bg);
+  background:
+    radial-gradient(900px 520px at 85% -120px, rgb(196 181 253 / 0.35), transparent 70%),
+    radial-gradient(700px 420px at -10% 10%, rgb(237 233 254 / 0.9), transparent 70%),
+    var(--color-bg);
+  background-attachment: fixed;
   color: var(--color-fg);
   font-feature-settings: "cv11", "ss01";
   -webkit-font-smoothing: antialiased;
@@ -59,13 +68,24 @@ body {
   @apply btn bg-accent text-white hover:bg-accent-hover;
 }
 @utility btn-secondary {
-  @apply btn border border-line-strong bg-transparent text-fg hover:bg-white/[0.06];
+  @apply btn border border-line-strong bg-white/70 text-fg hover:bg-white;
 }
 @utility btn-ghost {
-  @apply btn text-muted hover:bg-white/[0.06] hover:text-fg;
+  @apply btn text-muted hover:bg-black/[0.04] hover:text-fg;
+}
+@utility btn-pill {
+  @apply btn bg-accent px-4 py-2 text-[13px] text-white shadow-[0_6px_16px_-6px_rgb(124_58_237/0.6)] hover:bg-accent-hover;
 }
 @utility card {
-  @apply rounded-2xl border border-line bg-surface;
+  @apply rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgb(23_21_31/0.03)];
+}
+/* Frosted-glass card used across the v3 surfaces. */
+@utility glass {
+  @apply rounded-[26px] border border-white/80 bg-white/70 backdrop-blur-xl;
+  box-shadow: 0 1px 2px rgb(23 21 31 / 0.04), 0 12px 32px -14px rgb(76 29 149 / 0.18);
+}
+@utility eyebrow {
+  @apply text-[11px] font-semibold uppercase tracking-[0.14em] text-faint;
 }
 @utility label {
   @apply mb-1.5 block text-xs font-medium text-muted;
@@ -75,7 +95,7 @@ body {
 }
 @utility skeleton {
   @apply rounded-md bg-raised;
-  background-image: linear-gradient(90deg, transparent 0, rgb(255 255 255 / 0.05) 50%, transparent 100%);
+  background-image: linear-gradient(90deg, transparent 0, rgb(255 255 255 / 0.7) 50%, transparent 100%);
   background-size: 400px 100%;
   background-repeat: no-repeat;
   animation: var(--animate-shimmer);

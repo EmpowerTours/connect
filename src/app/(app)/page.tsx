@@ -1,62 +1,158 @@
-import { Sparkles, Users } from "lucide-react";
 import Link from "next/link";
-import type { PostCtx } from "@/components/post-card";
-import { UserAvatar } from "@/components/avatar";
-import { Composer } from "@/components/composer";
-import { EmptyState } from "@/components/empty-state";
-import { Columns, PageHeader, Tabs } from "@/components/layout";
-import { PostCard } from "@/components/post-card";
-import { RightRail } from "@/components/right-rail";
-import { getLocale, requireUser } from "@/lib/auth";
-import { getHomeFeed } from "@/lib/feed";
+import { ArrowUpRight, ChevronRight, KanbanSquare, Sparkles } from "lucide-react";
+import { OrgLogo, UserAvatar } from "@/components/avatar";
+import { DemoBadge } from "@/components/badges";
+import { Greeting } from "@/components/greeting";
+import { TabPage } from "@/components/layout";
+import { TopLine } from "@/components/shell";
+import { timeAgo } from "@/components/time";
+import { getLocale, getWorkspace, requireUser } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 import { t } from "@/lib/i18n";
-import { getPostCtx } from "@/lib/post-ctx";
+import { needsAttention } from "@/lib/pipeline";
+import { firstName, pickInsight } from "@/lib/today";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+export default async function TodayPage() {
   const user = await requireUser();
   const locale = await getLocale();
-  const tab = (await searchParams).tab === "all" ? "all" : "following";
-  const ctx = await getPostCtx(user, locale);
-
-  return (
-    <Columns rail={<RightRail viewerId={user.id} locale={locale} />}>
-      <PageHeader title={t(locale, "nav.home")}>
-        <Tabs
-          tabs={[
-            { href: "/", label: t(locale, "home.following"), active: tab === "following" },
-            { href: "/?tab=all", label: t(locale, "home.forYou"), active: tab === "all" },
-          ]}
-        />
-      </PageHeader>
-      <div className="hidden border-b border-line md:block" id="compose">
-        <Composer locale={locale} channels={ctx.channels} author={<UserAvatar name={user.name} seed={user.handle} size={42} />} />
-      </div>
-      {/* Rendered inline (no Suspense/loading.tsx): in Next 15.5 streamed boundaries here stopped server-action refreshes from applying. */}
-      {await HomeFeed({ viewerId: user.id, tab, ctx })}
-    </Columns>
+  const now = new Date();
+  const ws = await getWorkspace(user.id);
+  const since = new Date(now.getTime() - 7 * 86_400_000);
+  const [requests, deals, follows, signals] = await Promise.all([
+    prisma.intro.findMany({
+      where: { connectorId: user.id, status: "pending" },
+      include: { requester: true, target: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.deal.findMany({ where: { workspaceId: ws.id }, include: { org: { select: { name: true, slug: true } } } }),
+    prisma.followOrg.findMany({ where: { userId: user.id }, select: { org: { select: { slug: true } } } }),
+    prisma.signal.findMany({
+      where: { publishedAt: { gte: since }, orgs: { some: {} } },
+      include: { orgs: { include: { org: { select: { slug: true, name: true } } } } },
+      orderBy: { publishedAt: "desc" },
+      take: 200,
+    }),
+  ]);
+  const priority = new Set([...deals.map((d) => d.org.slug), ...follows.map((f) => f.org.slug)]);
+  const insight = pickInsight(
+    signals
+      .filter((s) => (locale === "en" ? !/\(ES\)$/.test(s.sourceName) : true))
+      .flatMap((s) => s.orgs.map((o) => ({ orgSlug: o.org.slug, orgName: o.org.name, title: s.title, sourceName: s.sourceName, url: s.url, publishedAt: s.publishedAt }))),
+    priority,
+    now,
   );
-}
+  const attention = needsAttention(deals, now).length;
+  const user1 = { name: user.name, handle: user.handle, isDemo: user.isDemo };
 
-async function HomeFeed({ viewerId, tab, ctx }: { viewerId: string; tab: "following" | "all"; ctx: PostCtx }) {
-  const items = await getHomeFeed(viewerId, tab);
-  const locale = ctx.locale;
-  if (items.length === 0) {
-    return (
-      <EmptyState
-        icon={tab === "following" ? Users : Sparkles}
-        title={t(locale, "home.emptyTitle")}
-        body={t(locale, "home.emptyBody")}
-        action={<Link href="/channels" className="btn-primary">{t(locale, "home.findChannels")}</Link>}
-      />
-    );
-  }
   return (
-    <div className="animate-fade-in">
-      {items.map((item) => (
-        <PostCard key={item.key} item={item} ctx={ctx} />
-      ))}
-    </div>
+    <TabPage>
+      <TopLine eyebrow={t(locale, "nav.today")} user={user1} />
+      <div className="mt-3 animate-rise">
+        <Greeting name={firstName(user.name)} locale={locale} serverHour={now.getHours()} />
+        <p className="mt-3 text-[15px] text-muted">{t(locale, "today.attention")}</p>
+      </div>
+
+      {/* Hero insight */}
+      {insight ? (
+        <Link
+          href={`/orgs/${insight.orgSlug}?tab=news`}
+          className="group relative mt-7 block overflow-hidden rounded-[28px] border border-white/80 p-6 shadow-[0_1px_2px_rgb(23_21_31/0.04),0_18px_40px_-18px_rgb(91_33_182/0.35)] transition active:scale-[0.99]"
+          style={{ background: "linear-gradient(140deg, #faf8ff 0%, #efe9ff 42%, #ddd0ff 100%)" }}
+        >
+          <span aria-hidden className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-lilac/50 blur-3xl" />
+          <span aria-hidden className="pointer-events-none absolute -bottom-24 left-10 h-48 w-48 rounded-full bg-white/70 blur-3xl" />
+          <div className="relative">
+            <p className="flex items-center gap-1.5 text-[12px] font-semibold text-accent-ink">
+              <Sparkles size={13} /> {t(locale, "today.insightKicker")}
+            </p>
+            <h2 className="mt-2.5 text-[22px] font-semibold leading-snug tracking-[-0.01em] text-fg">
+              {t(locale, "today.inTheNews").replace("{org}", insight.orgName)}
+              <br />
+              <span className="text-accent">
+                {insight.count === 1 ? t(locale, "today.newSignal") : t(locale, "today.newSignals").replace("{n}", String(insight.count))}
+              </span>
+            </h2>
+            <p className="mt-3 line-clamp-3 pr-6 text-[15px] leading-relaxed text-muted">“{insight.latest.title}”</p>
+            <div className="mt-5 flex items-end justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-white/80 py-0.5 pl-0.5 pr-3 text-[12px] font-semibold text-accent-ink">
+                  <OrgLogo slug={insight.orgSlug} name={insight.orgName} size={22} />
+                  {insight.orgName}
+                </span>
+                {insight.inPipeline && <span className="rounded-full bg-white/60 px-3 py-1 text-[12px] font-medium text-muted">{t(locale, "today.inDeals")}</span>}
+                <span className="text-[12px] text-faint">
+                  {insight.latest.sourceName} · {timeAgo(insight.latest.publishedAt, locale, now)}
+                </span>
+              </div>
+              <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white bg-white/70 text-accent transition group-hover:bg-white">
+                <ArrowUpRight size={19} />
+              </span>
+            </div>
+          </div>
+        </Link>
+      ) : (
+        <div className="glass mt-7 p-6">
+          <p className="text-[17px] font-semibold">{t(locale, "today.noInsightTitle")}</p>
+          <p className="mt-1 text-sm text-muted">{t(locale, "today.noInsightBody")}</p>
+        </div>
+      )}
+
+      {/* Intro requests waiting on you */}
+      <section className="mt-9">
+        <div className="mb-3 flex items-baseline justify-between px-1">
+          <h2 className="text-[17px] font-semibold tracking-tight">
+            {t(locale, "today.introRequests")}
+            {requests.length > 0 && <span className="ml-2 text-[15px] font-medium text-faint">{requests.length}</span>}
+          </h2>
+          <Link href="/intros" className="text-[13px] font-semibold text-accent hover:text-accent-hover">{t(locale, "today.seeAll")}</Link>
+        </div>
+        {requests.length === 0 ? (
+          <p className="glass px-5 py-4 text-sm text-muted">{t(locale, "today.noRequests")}</p>
+        ) : (
+          <ul className="space-y-2.5">
+            {requests.map((r) => (
+              <li key={r.id}>
+                <Link href="/intros" className="glass flex items-center gap-3.5 rounded-[22px]! px-4 py-3.5 transition hover:bg-white/90 active:scale-[0.99]">
+                  <span className="relative">
+                    <UserAvatar name={r.requester.name} seed={r.requester.handle} size={46} />
+                    <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-accent ring-2 ring-white" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1.5">
+                      <span className="truncate text-[15px] font-semibold">{r.requester.name}</span>
+                      {r.requester.isDemo && <DemoBadge locale={locale} />}
+                    </span>
+                    <span className="block truncate text-[13px] text-faint">{[r.requester.headline, r.requester.orgName].filter(Boolean).join(", ")}</span>
+                    <span className="mt-0.5 block truncate text-[12.5px] font-medium text-accent-ink">
+                      {t(locale, "today.wantsIntro")} {t(locale, "today.toTarget").replace("{name}", firstName(r.target.name))}
+                    </span>
+                  </span>
+                  <ChevronRight size={18} className="shrink-0 text-faint" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {attention > 0 && (
+        <section className="mt-8">
+          <h2 className="mb-3 px-1 text-[17px] font-semibold tracking-tight">{t(locale, "today.alsoToday")}</h2>
+          <Link href="/pipeline" className="glass flex items-center gap-3.5 rounded-[22px]! px-4 py-3.5 transition hover:bg-white/90">
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-accent-soft text-accent">
+              <KanbanSquare size={19} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-semibold">{attention === 1 ? t(locale, "today.followUp") : t(locale, "today.followUps").replace("{n}", String(attention))}</span>
+              <span className="block truncate text-[13px] text-faint">{t(locale, "nav.deals")}</span>
+            </span>
+            <ChevronRight size={18} className="text-faint" />
+          </Link>
+        </section>
+      )}
+      <p className="mt-8 px-1 text-center text-[11.5px] text-faint">{t(locale, "today.publicNews")}</p>
+    </TabPage>
   );
 }

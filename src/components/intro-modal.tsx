@@ -18,6 +18,7 @@ export async function IntroModal({
   introParam,
   error,
   locale,
+  via,
 }: {
   me: { id: string; name: string; handle: string };
   target: Person;
@@ -25,7 +26,10 @@ export async function IntroModal({
   introParam: string;
   error?: string;
   locale: Locale;
+  /** Handle of the connector to preselect (e.g. from the Circle warm path). */
+  via?: string;
 }) {
+  const connectors = via ? [...mutual].sort((a, b) => Number(b.handle === via) - Number(a.handle === via)) : mutual;
   const close = `/u/${target.handle}`;
   const draft =
     introParam !== "1"
@@ -34,9 +38,9 @@ export async function IntroModal({
   const provider = getScoutProvider().name;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm animate-fade-in sm:items-start sm:p-4 sm:pt-[8vh]" role="dialog" aria-modal="true" aria-labelledby="intro-title">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-zinc-900/30 backdrop-blur-sm animate-fade-in sm:items-start sm:p-4 sm:pt-[8vh]" role="dialog" aria-modal="true" aria-labelledby="intro-title">
       <Link href={close} scroll={false} className="absolute inset-0 cursor-default" aria-label="Close" />
-      <div className="relative max-h-[92dvh] w-full overflow-y-auto rounded-t-3xl border border-line-strong bg-surface shadow-2xl animate-rise sm:max-w-[560px] sm:rounded-3xl">
+      <div className="relative max-h-[92dvh] w-full overflow-y-auto rounded-t-[28px] border border-line bg-surface shadow-2xl animate-rise sm:max-w-[560px] sm:rounded-[28px]">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface/95 px-4 py-3 backdrop-blur">
           <Link href={close} scroll={false} className="btn-ghost h-9 w-9 p-0" aria-label="Close"><X size={18} /></Link>
           <h2 id="intro-title" className="text-[16px] font-bold">{t(locale, "introModal.title")}</h2>
@@ -69,7 +73,7 @@ export async function IntroModal({
                 <fieldset>
                   <legend className="label">{t(locale, "introModal.via")}</legend>
                   <div className="space-y-2">
-                    {mutual.map((m, i) => (
+                    {connectors.map((m, i) => (
                       <label key={m.id} className="flex cursor-pointer items-center gap-3 rounded-2xl border border-line p-3 transition hover:border-line-strong has-[:checked]:border-accent has-[:checked]:bg-accent-soft">
                         <input type="radio" name="connectorId" value={m.id} defaultChecked={i === 0} className="accent-[var(--color-accent)]" />
                         <UserAvatar name={m.name} seed={m.handle} size={36} />

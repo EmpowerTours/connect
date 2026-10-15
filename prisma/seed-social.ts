@@ -86,7 +86,7 @@ export async function seedSocial(prisma: PrismaClient) {
 
   const users: Record<string, string> = {};
   const me = await prisma.user.findUniqueOrThrow({ where: { handle: "demo" } });
-  await prisma.user.update({ where: { id: me.id }, data: { isDemo: true, headline: "Business Development", location: "Mexico City" } });
+  await prisma.user.update({ where: { id: me.id }, data: { isDemo: true, name: "Alex Rivera", headline: "Business Development", location: "Mexico City" } });
   users.demo = me.id;
   for (const u of DEMO_USERS) {
     const data = { ...u, email: `${u.handle}@demo.corridor.local`, isDemo: true, role: u.headline, voice: "" };
@@ -97,6 +97,7 @@ export async function seedSocial(prisma: PrismaClient) {
 
   // Reset previous demo social content (only rows involving demo accounts).
   await prisma.post.deleteMany({ where: { authorId: { in: demoIds } } });
+  await prisma.opportunity.deleteMany({ where: { authorId: { in: demoIds } } });
   await prisma.intro.deleteMany({ where: { OR: [{ requesterId: { in: demoIds } }, { connectorId: { in: demoIds } }] } });
   await prisma.followUser.deleteMany({ where: { followerId: { in: demoIds }, followeeId: { in: demoIds } } });
   await prisma.channelMember.deleteMany({ where: { userId: { in: demoIds } } });
@@ -150,10 +151,40 @@ export async function seedSocial(prisma: PrismaClient) {
     "Hi! Would you be comfortable introducing me to Priya? I'd like to learn how tokenized funds handle redemptions — we're designing a treasury feature at Pesito. No worries if the timing isn't right.\nThanks!\nSofía", "", 3);
   await intro("demo", "priya", "mei", "accepted", "Understand custody requirements for a stablecoin pilot.",
     "Hi Priya, would you be comfortable introducing me to Mei? I'd like to understand custody requirements for a stablecoin pilot.\nThanks!",
-    "Mei — Demo is mapping LatAm stablecoin rails and asked great questions on custody. Worth 20 minutes.", 50);
+    "Mei — Alex is mapping LatAm stablecoin rails and asked great questions on custody. Worth 20 minutes.", 50);
   await intro("valeria", "demo", "lucas", "accepted", "Explore the ecosystem fund for our payout rails.",
     "Hi! Could you introduce me to Lucas? We'd like to explore the ecosystem fund for Quetzal Rails.\nThanks!\nValeria",
     "Lucas — Valeria runs partnerships at Quetzal Rails; strong fit for your payments track.", 70);
   await intro("lucas", "tomas", "daniel", "declined", "Advisor perspective on chain selection.", "Hi Tomás, could you introduce me to Daniel?", "Daniel is heads-down on a client project this quarter — try again in January.", 90);
-  console.log(`Seeded ${DEMO_USERS.length} demo users, ${CHANNELS.length} channels, ${POSTS.length} demo posts, 4 intros.`);
+  await intro("valeria", "demo", "priya", "pending", "Find a tokenized money-market fund partner for SME treasury balances.",
+    "Hi! Would you be open to introducing me to Priya? Quetzal Rails wants to offer SMEs a tokenized money-market option for idle balances and I'd value her view on distribution.\nThanks!\nValeria", "", 7);
+  await intro("lucas", "demo", "sofia", "pending", "Explore Pesito as a launch partner for the payments grant track.",
+    "Hi! Could you introduce me to Sofía? Atlas L1's payments grant track is looking for remittance teams and Pesito looks like a great fit.\nThanks!\nLucas", "", 26);
+
+  // Asks & offers (Opportunities tab). All from the fictional demo companies above.
+  const OPPS: { by: string; kind: "ask" | "offer"; headline: string; body: string; region: string; hoursAgo: number }[] = [
+    { by: "tomas", kind: "ask", headline: "Banco Meridiano is evaluating 2 chains", region: "latam", hoursAgo: 5,
+      body: "Looking for intros to teams running tokenized-deposit pilots in production." },
+    { by: "mei", kind: "offer", headline: "Keystone Custody is opening APAC custody pilots", region: "apac", hoursAgo: 9,
+      body: "Offering sandbox access to funds and fintechs tokenizing out of Singapore." },
+    { by: "sofia", kind: "ask", headline: "Pesito is raising a seed round", region: "latam", hoursAgo: 20,
+      body: "Seeking intros to fintech funds that back US→MX remittance products." },
+    { by: "lucas", kind: "offer", headline: "Atlas L1 Foundation has a payments grant track", region: "latam", hoursAgo: 30,
+      body: "Grants and go-to-market help for stablecoin payout and on/off-ramp builders." },
+    { by: "priya", kind: "ask", headline: "Harbor Asset Management needs a transfer-agent partner", region: "north_america", hoursAgo: 44,
+      body: "Open to intros to onchain transfer agents for a tokenized fund share class." },
+    { by: "daniel", kind: "offer", headline: "Clearwater Advisory runs chain-selection workshops", region: "europe", hoursAgo: 60,
+      body: "Half-day sessions for bank teams comparing settlement networks. Vendor-neutral." },
+    { by: "valeria", kind: "ask", headline: "Quetzal Rails wants a regulated custodian", region: "latam", hoursAgo: 72,
+      body: "MXN↔USD stablecoin payout pilot, sandbox first. Intros to custody teams welcome." },
+    { by: "james", kind: "offer", headline: "Ridgeline Research is sharing a settlement-cycle study", region: "north_america", hoursAgo: 96,
+      body: "Happy to walk market-infra teams through the findings on tokenized collateral." },
+  ];
+  for (const o of OPPS) {
+    const author = DEMO_USERS.find((u) => u.handle === o.by)!;
+    await prisma.opportunity.create({
+      data: { authorId: users[o.by], kind: o.kind, headline: o.headline, body: o.body, region: o.region, orgName: author.orgName, createdAt: new Date(now - o.hoursAgo * 3600_000) },
+    });
+  }
+  console.log(`Seeded ${DEMO_USERS.length} demo users, ${CHANNELS.length} channels, ${POSTS.length} demo posts, 6 intros, ${OPPS.length} opportunities.`);
 }

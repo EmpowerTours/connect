@@ -12,7 +12,7 @@ export default async function ComposePage({ searchParams }: { searchParams: Prom
   const { channel } = await searchParams;
   return (
     <Columns>
-      <PageHeader title={t(locale, "composer.newCast")} back="/" />
+      <PageHeader title={t(locale, "composer.newCast")} back="/more" />
       <div className="border-b border-line">
         <Composer
           locale={locale}

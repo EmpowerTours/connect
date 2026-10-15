@@ -50,8 +50,8 @@ export default async function SignalsPage({ searchParams }: { searchParams: Prom
     </div>
   );
   return (
-    <Columns rail={rail}>
-      <PageHeader title={t(locale, "signals.title")} subtitle={t(locale, "signals.subtitle")} back="/">
+    <Columns>
+      <PageHeader title={t(locale, "signals.title")} subtitle={t(locale, "signals.subtitle")} back="/more">
         <Tabs
           tabs={[
             { href: "/signals", label: t(locale, "signals.tagged"), active: !scope },
@@ -79,6 +79,7 @@ export default async function SignalsPage({ searchParams }: { searchParams: Prom
           </li>
         ))}
       </ul>
+      <div className="p-4">{rail}</div>
     </Columns>
   );
 }

@@ -5,7 +5,6 @@ import { UserAvatar } from "@/components/avatar";
 import { DemoBadge } from "@/components/badges";
 import { EmptyState } from "@/components/empty-state";
 import { Columns, PageHeader, Tabs } from "@/components/layout";
-import { RightRail } from "@/components/right-rail";
 import { timeAgo } from "@/components/time";
 import { getLocale, requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -16,7 +15,7 @@ export const dynamic = "force-dynamic";
 
 const STATUS_STYLE: Record<IntroStatus, string> = {
   draft: "border-line-strong text-faint",
-  pending: "border-amber-400/40 bg-amber-400/10 text-amber-200",
+  pending: "border-amber-300 bg-amber-50 text-amber-800",
   accepted: "border-success/40 bg-success/10 text-success",
   declined: "border-danger/40 bg-danger/10 text-danger",
   withdrawn: "border-line text-faint",
@@ -62,7 +61,7 @@ export default async function IntrosPage({ searchParams }: { searchParams: Promi
   const pending = await prisma.intro.count({ where: { connectorId: user.id, status: "pending" } });
 
   return (
-    <Columns rail={<RightRail viewerId={user.id} locale={locale} />}>
+    <Columns>
       <PageHeader title={t(locale, "nav.intros")} subtitle={t(locale, "intros.subtitle")}>
         <Tabs
           tabs={[

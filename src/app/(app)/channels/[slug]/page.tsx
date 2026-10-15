@@ -6,7 +6,6 @@ import { Composer } from "@/components/composer";
 import { EmptyState } from "@/components/empty-state";
 import { Columns, PageHeader } from "@/components/layout";
 import { PostCard } from "@/components/post-card";
-import { RightRail } from "@/components/right-rail";
 import { getLocale, requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getChannelFeed } from "@/lib/feed";
@@ -31,7 +30,7 @@ export default async function ChannelPage({ params }: { params: Promise<{ slug: 
   const [items, ctx] = await Promise.all([getChannelFeed(user.id, channel.id), getPostCtx(user, locale)]);
 
   return (
-    <Columns rail={<RightRail viewerId={user.id} locale={locale} />}>
+    <Columns>
       <PageHeader title={`/${channel.slug}`} subtitle={`${channel._count.members} ${t(locale, "channels.members")}`} back="/channels" />
       <section className="border-b border-line px-4 py-5">
         <div className="flex items-start gap-4">

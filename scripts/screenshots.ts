@@ -11,24 +11,28 @@ import { chromium, type Page } from "playwright-core";
 const BASE = process.env.BASE_URL ?? "http://localhost:3000";
 const OUT = process.env.OUT_DIR ?? path.resolve(process.cwd(), "..");
 const CHROME = process.env.CHROME_PATH ?? "/usr/bin/google-chrome";
-const file = (name: string) => path.join(OUT, `corridor-${name}.png`);
+const PREFIX = process.env.PREFIX ?? "corridor-v3";
+const file = (name: string) => path.join(OUT, `${PREFIX}-${name}.png`);
+
+// Headless Chrome with isMobile sometimes never reports elements as "stable", so click via the DOM.
+const domClick = (page: Page, selector: string) => page.locator(selector).first().evaluate((el) => (el as HTMLElement).click());
 
 async function login(page: Page) {
   await page.goto(`${BASE}/login`);
   await page.getByRole("button", { name: /demo/i }).first().evaluate((el) => (el as HTMLElement).click());
   await page.waitForURL((u) => !u.pathname.startsWith("/login"));
   // The locale is stored on the user; make sure we start in English.
-  const toggle = page.locator("button[aria-label='Switch language']").first();
-  if ((await toggle.textContent())?.trim() === "EN") {
-    await toggle.evaluate((el) => (el as HTMLElement).click());
-    await page.waitForFunction(() => document.documentElement.lang === "en" || !!document.querySelector("button[aria-label='Switch language']")?.textContent?.includes("ES"));
+  if ((await page.evaluate(() => document.documentElement.lang)) !== "en") {
+    await page.goto(`${BASE}/more`);
+    await domClick(page, "button[aria-label='Switch language']");
+    await page.waitForFunction(() => document.documentElement.lang === "en");
   }
 }
 
 async function settle(page: Page) {
   await page.waitForLoadState("networkidle");
   await page.evaluate(() => document.fonts.ready);
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(700); // let entrance animations finish
 }
 
 async function shot(page: Page, url: string, name: string) {
@@ -41,31 +45,23 @@ async function shot(page: Page, url: string, name: string) {
 async function main() {
   const browser = await chromium.launch({ executablePath: CHROME, headless: true });
 
-  const desktop = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2, colorScheme: "dark" });
-  const d = await desktop.newPage();
-  await login(d);
-  await shot(d, "/", "home-desktop");
-  await shot(d, "/u/tomas", "profile-desktop");
-  await shot(d, "/orgs/bitso", "org-desktop");
-  await shot(d, "/channels", "channels-desktop");
-  await shot(d, "/pipeline", "pipeline-desktop");
-  await shot(d, "/intros", "intros-desktop");
-
-  // Warm intro: pick a mutual connection, give a reason, let the scout draft the ask.
-  await d.goto(`${BASE}/u/tomas?intro=1`);
-  await d.locator("textarea[name=reason]").fill("Exploring a USDC settlement pilot for remittance corridors into Mexico");
-  await d.locator("[role=dialog] form button").first().click();
-  await d.waitForURL((u) => { const v = u.searchParams.get("intro"); return !!v && v !== "1"; });
-  await d.locator("textarea[name=message]").waitFor();
-  await settle(d);
-  await d.screenshot({ path: file("intro-modal-desktop"), type: "png" });
-  console.log("wrote", file("intro-modal-desktop"));
-
-  const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, colorScheme: "dark" });
+  const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, colorScheme: "light" });
   const m = await mobile.newPage();
   await login(m);
-  await shot(m, "/", "feed-mobile");
-  await shot(m, "/u/valeria", "profile-mobile");
+  await shot(m, "/", "today-mobile");
+  await shot(m, "/opportunities", "opportunities-mobile");
+  await shot(m, "/circle", "circle-mobile");
+  await domClick(m, "button[aria-label^='Tomás']");
+  await m.locator("[role=dialog]").waitFor();
+  await settle(m);
+  await m.screenshot({ path: file("circle-sheet-mobile"), type: "png" });
+  console.log("wrote", file("circle-sheet-mobile"));
+
+  const desktop = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2, colorScheme: "light" });
+  const d = await desktop.newPage();
+  await login(d);
+  await shot(d, "/", "today-desktop");
+  await shot(d, "/opportunities", "opportunities-desktop");
 
   await browser.close();
 }

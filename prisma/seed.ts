@@ -37,7 +37,7 @@ async function main() {
     update: {},
     create: {
       email: "demo@corridor.local",
-      name: "Demo BD Lead",
+      name: "Alex Rivera",
       isDemo: true,
       handle: "demo",
       role: "Business Development",

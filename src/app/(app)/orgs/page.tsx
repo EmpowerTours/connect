@@ -4,7 +4,6 @@ import { createOrgAction } from "@/app/actions";
 import { OrgLogo } from "@/components/avatar";
 import { EmptyState } from "@/components/empty-state";
 import { Columns, PageHeader } from "@/components/layout";
-import { RightRail } from "@/components/right-rail";
 import { getLocale, getWorkspace, requireUser } from "@/lib/auth";
 import { ORG_TYPES, REGIONS } from "@/lib/constants";
 import { prisma } from "@/lib/db";
@@ -33,7 +32,7 @@ export default async function OrgsPage({ searchParams }: { searchParams: Promise
   const typeHref = (ty: string) => `/orgs?${new URLSearchParams({ ...(q ? { q } : {}), ...(ty ? { type: ty } : {}), ...(region ? { region } : {}) })}`;
 
   return (
-    <Columns rail={<RightRail viewerId={user.id} locale={locale} />}>
+    <Columns>
       <PageHeader title={t(locale, "orgs.title")} subtitle={`${orgs.length} ${t(locale, "directory.count")}`} back="/search" />
       <div className="space-y-3 border-b border-line p-4">
         <form className="flex gap-2">
@@ -59,7 +58,7 @@ export default async function OrgsPage({ searchParams }: { searchParams: Promise
       <ul>
         {orgs.map((o) => (
           <li key={o.id}>
-            <Link href={`/orgs/${o.slug}`} className="flex items-center gap-3.5 border-b border-line px-4 py-3 transition hover:bg-white/[0.02]">
+            <Link href={`/orgs/${o.slug}`} className="flex items-center gap-3.5 border-b border-line px-4 py-3 transition hover:bg-black/[0.03]">
               <OrgLogo slug={o.slug} name={o.name} size={44} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-semibold">{o.name}</span>

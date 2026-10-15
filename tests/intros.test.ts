@@ -67,7 +67,7 @@ describe("reputation", () => {
 describe("AI intro draft (mock provider)", () => {
   const input = {
     locale: "en" as const,
-    requester: { name: "Demo BD Lead", headline: "BD", orgName: "EmpowerTours", voice: "" },
+    requester: { name: "Alex Rivera", headline: "BD", orgName: "EmpowerTours", voice: "" },
     connector: { name: "Valeria Ortiz" },
     target: { name: "Tomás Reyes", headline: "Head of Partnerships", orgName: "Quetzal Rails" },
     reason: "Explore a stablecoin settlement pilot",
@@ -81,7 +81,7 @@ describe("AI intro draft (mock provider)", () => {
     expect(r.message).toContain("Here's why I'm asking: explore a stablecoin settlement pilot");
     expect(r.message).not.toContain("..");
     expect(r.message).toContain("Bitso, stablecoins");
-    expect(r.message.trim().endsWith("Demo BD Lead")).toBe(true);
+    expect(r.message.trim().endsWith("Alex Rivera")).toBe(true);
   });
   it("Spanish and short voice", async () => {
     const r = await new MockScoutProvider().draftIntro({ ...input, locale: "es", requester: { ...input.requester, voice: "breve" } });

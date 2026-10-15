@@ -158,13 +158,13 @@ export function PrivateDealPanel({ org, deal, drafts, locale, providerName, scou
                 {deal.contacts.map((c) => (
                   <li key={c.id} className="flex items-center justify-between gap-2 text-sm">
                     <span>
-                      {c.isChampion && <span className="mr-1 text-emerald-300">★</span>}
+                      {c.isChampion && <span className="mr-1 text-green-700">★</span>}
                       {c.name} <span className="text-faint">{c.title}</span>
                     </span>
                     <form action={removeContactAction}>
                       <input type="hidden" name="dealId" value={deal.id} />
                       <input type="hidden" name="id" value={c.id} />
-                      <button className="text-xs text-faint hover:text-rose-300">{t(locale, "deal.remove")}</button>
+                      <button className="text-xs text-faint hover:text-red-700">{t(locale, "deal.remove")}</button>
                     </form>
                   </li>
                 ))}
@@ -191,12 +191,12 @@ export function PrivateDealPanel({ org, deal, drafts, locale, providerName, scou
                       ) : (
                         <span className="text-faint">{a.firm}</span>
                       )}{" "}
-                      <span className={`chip ${a.influence === "high" ? "border-amber-500/50 text-amber-300" : ""}`}>{a.influence}</span>
+                      <span className={`chip ${a.influence === "high" ? "border-amber-300 text-amber-800" : ""}`}>{a.influence}</span>
                     </span>
                     <form action={removeAdvisorAction}>
                       <input type="hidden" name="dealId" value={deal.id} />
                       <input type="hidden" name="id" value={a.id} />
-                      <button className="text-xs text-faint hover:text-rose-300">{t(locale, "deal.remove")}</button>
+                      <button className="text-xs text-faint hover:text-red-700">{t(locale, "deal.remove")}</button>
                     </form>
                   </li>
                 ))}
@@ -247,7 +247,7 @@ export function PrivateDealPanel({ org, deal, drafts, locale, providerName, scou
                 <DraftPendingSkeleton label={t(locale, "introModal.drafting")} />
               </div>
             </form>
-            {scoutError && <p className="mt-2 text-sm text-rose-300">Scout provider error — check server logs / API key.</p>}
+            {scoutError && <p className="mt-2 text-sm text-red-700">Scout provider error — check server logs / API key.</p>}
             {providerName === "mock" && <p className="mt-2 text-xs text-faint">{t(locale, "scout.mockNote")}</p>}
             <div className="mt-4 space-y-4">
               {drafts.length === 0 && <p className="text-sm text-faint">{t(locale, "scout.empty")}</p>}

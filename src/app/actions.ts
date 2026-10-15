@@ -17,6 +17,7 @@ import { slugify } from "@/lib/slug";
 import { extractCashtags, matchOrgs } from "@/lib/tagging";
 import { applyIntroAction, validateIntroRequest, type IntroAction } from "@/lib/intros";
 import { extractMentions, isPostKind, threadIdsFor, validatePostBody } from "@/lib/posts";
+import { validateOpportunity } from "@/lib/opportunities";
 
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
 
@@ -482,4 +483,18 @@ export async function ingestNowAction() {
   await requireUser();
   await ingestAllFeeds(prisma);
   revalidatePath("/", "layout");
+}
+
+/* ---------- opportunities (asks & offers) ---------- */
+
+export async function createOpportunityAction(fd: FormData) {
+  const user = await requireUser();
+  const backRaw = str(fd, "back");
+  const back = backRaw.startsWith("/opportunities") ? backRaw : "/opportunities";
+  const r = validateOpportunity({ kind: str(fd, "kind"), headline: str(fd, "headline"), body: str(fd, "body"), region: str(fd, "region") });
+  if (!r.ok) redirect(`${back}${back.includes("?") ? "&" : "?"}new=1&error=${r.error}`);
+  const orgName = str(fd, "orgName").trim().slice(0, 80) || user.orgName;
+  await prisma.opportunity.create({ data: { ...r.value, orgName, orgId: orgName === user.orgName ? (user.orgId ?? null) : null, authorId: user.id } });
+  revalidatePath("/opportunities");
+  redirect(back);
 }

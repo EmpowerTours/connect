@@ -56,10 +56,10 @@ export function PostActions({ postId, locale, counts, liked, recasted, channels,
           <>
             <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0 z-20 cursor-default" onClick={() => setMenu(false)} />
             <div className="absolute left-0 top-9 z-30 w-44 overflow-hidden rounded-xl border border-line-strong bg-raised py-1 shadow-2xl animate-fade-in">
-              <button type="button" onClick={recast} className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm text-fg hover:bg-white/[0.06]">
+              <button type="button" onClick={recast} className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm text-fg hover:bg-black/[0.03]">
                 <Repeat2 size={16} /> {state.recasted ? t(locale, "post.undoRecast") : t(locale, "post.recast")}
               </button>
-              <button type="button" onClick={() => { setMenu(false); setQuoting(true); }} className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm text-fg hover:bg-white/[0.06]">
+              <button type="button" onClick={() => { setMenu(false); setQuoting(true); }} className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm text-fg hover:bg-black/[0.03]">
                 <Quote size={16} /> {t(locale, "post.quote")}
               </button>
             </div>
@@ -74,7 +74,7 @@ export function PostActions({ postId, locale, counts, liked, recasted, channels,
       </button>
       <span className="w-8" />
       {quoting && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-3 pt-[10vh] backdrop-blur-sm animate-fade-in" role="dialog" aria-modal="true">
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-zinc-900/30 p-3 pt-[10vh] backdrop-blur-sm animate-fade-in" role="dialog" aria-modal="true">
           <div className="card w-full max-w-[560px] p-2 text-fg animate-rise">
             <div className="flex items-center justify-between px-2 py-1">
               <button type="button" onClick={() => setQuoting(false)} className="btn-ghost h-9 w-9 p-0" aria-label="Close"><X size={18} /></button>

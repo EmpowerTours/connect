@@ -8,7 +8,6 @@ import { EmptyState } from "@/components/empty-state";
 import { IntroModal } from "@/components/intro-modal";
 import { Columns, PageHeader, Tabs } from "@/components/layout";
 import { PostCard } from "@/components/post-card";
-import { RightRail } from "@/components/right-rail";
 import { getLocale, requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getUserFeed } from "@/lib/feed";
@@ -23,7 +22,7 @@ export default async function ProfilePage({
   searchParams,
 }: {
   params: Promise<{ handle: string }>;
-  searchParams: Promise<{ tab?: string; intro?: string; error?: string; saved?: string }>;
+  searchParams: Promise<{ tab?: string; intro?: string; error?: string; saved?: string; via?: string }>;
 }) {
   const { handle } = await params;
   const sp = await searchParams;
@@ -52,8 +51,8 @@ export default async function ProfilePage({
   ];
 
   return (
-    <Columns rail={<RightRail viewerId={me.id} locale={locale} />}>
-      <PageHeader title={user.name} subtitle={`${user._count.posts} ${t(locale, "profile.casts")}`} back="/" />
+    <Columns>
+      <PageHeader title={user.name} subtitle={`${user._count.posts} ${t(locale, "profile.casts")}`} back="/more" />
       <section className="border-b border-line">
         <div className="h-28 bg-[radial-gradient(120%_140%_at_0%_0%,rgb(124_92_255/0.55),transparent_55%),radial-gradient(120%_140%_at_100%_100%,rgb(124_92_255/0.25),transparent_60%)] sm:h-36" />
         <div className="px-4 pb-4">
@@ -97,7 +96,7 @@ export default async function ProfilePage({
               </p>
             )}
             {user.bio && <p className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-fg/90">{user.bio}</p>}
-            {user.isDemo && <p className="mt-2 text-xs text-amber-200/80">{t(locale, "demo.profileNote")}</p>}
+            {user.isDemo && <p className="mt-2 text-xs text-amber-800">{t(locale, "demo.profileNote")}</p>}
             <p className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-faint">
               {user.location && <span className="inline-flex items-center gap-1"><MapPin size={14} />{user.location}</span>}
               <span className="inline-flex items-center gap-1"><CalendarDays size={14} />{t(locale, "profile.joined")} {user.createdAt.toLocaleDateString(locale === "es" ? "es-MX" : "en-US", { month: "long", year: "numeric" })}</span>
@@ -186,7 +185,7 @@ export default async function ProfilePage({
         items.map((item) => <PostCard key={item.key} item={item} ctx={ctx} />)
       )}
 
-      {sp.intro && canRequestIntro && <IntroModal me={me} target={user} mutual={mutualUsers} introParam={sp.intro} error={sp.error} locale={locale} />}
+      {sp.intro && canRequestIntro && <IntroModal me={me} target={user} mutual={mutualUsers} introParam={sp.intro} error={sp.error} locale={locale} via={sp.via} />}
     </Columns>
   );
 }

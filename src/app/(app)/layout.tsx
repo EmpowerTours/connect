@@ -1,4 +1,5 @@
-import { LeftNav, MobileTabs, MobileTop } from "@/components/shell";
+import { TabBar } from "@/components/nav-items";
+import { SideRail } from "@/components/shell";
 import { getLocale, requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
@@ -9,12 +10,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const shellUser = { name: user.name, handle: user.handle, isDemo: user.isDemo };
   return (
     <>
-      <MobileTop locale={locale} user={shellUser} />
-      <div className="mx-auto flex max-w-[1320px] justify-center">
-        <LeftNav locale={locale} user={shellUser} pendingIntros={pendingIntros} />
-        <div className="min-w-0 flex-1 pb-24 md:pb-0">{children}</div>
+      <div className="mx-auto flex max-w-[1200px]">
+        <SideRail locale={locale} user={shellUser} pendingIntros={pendingIntros} />
+        <div className="min-w-0 flex-1 pb-28 md:pb-10">{children}</div>
       </div>
-      <MobileTabs locale={locale} user={shellUser} pendingIntros={pendingIntros} />
+      <TabBar locale={locale} />
     </>
   );
 }

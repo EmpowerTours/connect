@@ -79,7 +79,7 @@ export default async function PipelinePage() {
             <ul className="space-y-2">
               {competing.map((c) => (
                 <li key={c.chain} className="text-sm">
-                  <span className="chip mr-2 border-rose-500/40 text-rose-200">{c.chain}</span>
+                  <span className="chip mr-2 border-red-300 text-red-700">{c.chain}</span>
                   <span className="text-fg/90">{c.orgs.join(", ")}</span>
                 </li>
               ))}

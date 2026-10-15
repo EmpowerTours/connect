@@ -42,7 +42,7 @@ function AuthorLine({ author, at, locale, size = "md", linked = true }: { author
 
 export function QuoteEmbed({ post, ctx }: { post: NonNullable<FeedPost["quoteOf"]>; ctx: PostCtx }) {
   return (
-    <Link href={`/post/${post.id}`} className="relative z-10 mt-2.5 block rounded-2xl border border-line p-3 transition hover:border-line-strong hover:bg-white/[0.02]">
+    <Link href={`/post/${post.id}`} className="relative z-10 mt-2.5 block rounded-2xl border border-line p-3 transition hover:border-line-strong hover:bg-black/[0.03]">
       <div className="flex items-center gap-2">
         <UserAvatar name={post.author.name} seed={post.author.handle} size={20} />
         <AuthorLine author={post.author} at={post.createdAt} locale={ctx.locale} size="sm" linked={false} />
@@ -56,7 +56,7 @@ export function PostCard({ item, ctx, variant = "feed", connector }: { item: Fee
   const { post } = item;
   const focus = variant === "focus";
   return (
-    <article className={`group/post relative px-4 transition-colors ${focus ? "pt-4" : "py-3.5 hover:bg-white/[0.015]"} ${variant === "feed" ? "border-b border-line" : ""}`}>
+    <article className={`group/post relative px-4 transition-colors ${focus ? "pt-4" : "py-3.5 hover:bg-black/[0.03]"} ${variant === "feed" ? "border-b border-line" : ""}`}>
       {!focus && <Link href={`/post/${post.id}`} className="absolute inset-0" aria-label={t(ctx.locale, "post.open")} />}
       {item.recastBy && (
         <p className="relative z-10 mb-1.5 ml-[30px] flex items-center gap-1.5 text-[13px] font-medium text-faint">

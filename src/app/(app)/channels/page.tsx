@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Hash } from "lucide-react";
 import { toggleChannelAction } from "@/app/actions";
 import { Columns, PageHeader } from "@/components/layout";
-import { RightRail } from "@/components/right-rail";
 import { getLocale, requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { t } from "@/lib/i18n";
@@ -26,11 +25,11 @@ export default async function ChannelsPage() {
     .sort((a, b) => Number(b.joined) - Number(a.joined) || b.score - a.score);
 
   return (
-    <Columns rail={<RightRail viewerId={user.id} locale={locale} />}>
+    <Columns>
       <PageHeader title={t(locale, "nav.channels")} subtitle={t(locale, "channels.subtitle")} />
       <ul>
         {sorted.map((c) => (
-          <li key={c.id} className="group relative flex items-center gap-4 border-b border-line px-4 py-4 transition hover:bg-white/[0.015]">
+          <li key={c.id} className="group relative flex items-center gap-4 border-b border-line px-4 py-4 transition hover:bg-black/[0.03]">
             <Link href={`/channels/${c.slug}`} className="absolute inset-0" aria-label={c.name} />
             <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-accent-soft text-accent">
               <Hash size={22} />

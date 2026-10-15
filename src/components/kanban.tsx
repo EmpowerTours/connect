@@ -47,7 +47,7 @@ export function Kanban({ cards, locale }: { cards: KanbanCard[]; locale: Locale 
 
   return (
     <div>
-      {error && <p className="mb-3 rounded-lg bg-rose-500/10 px-3 py-2 text-sm text-rose-300">{error}</p>}
+      {error && <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
       <div className={`-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-3 ${pending ? "opacity-80" : ""}`}>
         {STAGES.map((stage) => {
           const col = optimistic.filter((c) => c.stage === stage);
@@ -100,13 +100,13 @@ export function Kanban({ cards, locale }: { cards: KanbanCard[]; locale: Locale 
                       <div className="mt-2 space-y-1.5">
                         <p className="text-xs text-fg/90">
                           <span className="text-faint">→ </span>
-                          {c.nextAction || <em className="text-rose-300/80">{locale === "es" ? "Sin siguiente acción" : "No next action"}</em>}
+                          {c.nextAction || <em className="text-red-700">{locale === "es" ? "Sin siguiente acción" : "No next action"}</em>}
                         </p>
                         <div className="flex flex-wrap gap-1">
                           <DueChip status={c.dueStatus} date={c.due ? new Date(c.due) : null} locale={locale} />
                           {c.champion && <span className="chip border-success/40 text-success">★ {c.champion}</span>}
                           {c.competing.map((ch) => (
-                            <span key={ch} className="chip border-rose-500/30 text-rose-200">vs {ch}</span>
+                            <span key={ch} className="chip border-red-300 text-red-700">vs {ch}</span>
                           ))}
                         </div>
                       </div>
@@ -115,7 +115,7 @@ export function Kanban({ cards, locale }: { cards: KanbanCard[]; locale: Locale 
                           type="button"
                           disabled={!prev}
                           onClick={() => prev && move(c, prev)}
-                          className="rounded px-2 py-0.5 text-xs text-muted hover:bg-white/5 disabled:invisible"
+                          className="rounded px-2 py-0.5 text-xs text-muted hover:bg-black/[0.04] disabled:invisible"
                           aria-label="Move back"
                         >
                           ←
@@ -124,7 +124,7 @@ export function Kanban({ cards, locale }: { cards: KanbanCard[]; locale: Locale 
                           <button
                             type="button"
                             onClick={() => move(c, "lost")}
-                            className="rounded px-2 py-0.5 text-[11px] text-faint hover:text-rose-300"
+                            className="rounded px-2 py-0.5 text-[11px] text-faint hover:text-red-700"
                           >
                             {t(locale, "stage.lost")}
                           </button>
@@ -137,7 +137,7 @@ export function Kanban({ cards, locale }: { cards: KanbanCard[]; locale: Locale 
                           type="button"
                           disabled={!next}
                           onClick={() => next && move(c, next)}
-                          className="rounded px-2 py-0.5 text-xs text-fg/90 hover:bg-white/5 disabled:invisible"
+                          className="rounded px-2 py-0.5 text-xs text-fg/90 hover:bg-black/[0.04] disabled:invisible"
                           aria-label="Move forward"
                         >
                           →

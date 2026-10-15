@@ -56,6 +56,7 @@ model User {
   followsOrgs  FollowOrg[]
   following    FollowUser[] @relation("Follower")
   followers    FollowUser[] @relation("Followee")
+  opportunities      Opportunity[]
 }
 
 model Session {
@@ -101,6 +102,7 @@ model Organization {
   followers FollowOrg[]
   drafts    ScoutDraft[]
   advisingOn Advisor[]
+  opportunities Opportunity[]
 }
 
 model Workspace {
@@ -296,6 +298,23 @@ model ChannelMember {
 }
 
 /// Warm intro: requester asks connector (a mutual connection) to introduce them to target.
+/// An ask or offer posted on behalf of an organization ("Opportunities" tab).
+model Opportunity {
+  id        String        @id @default(cuid())
+  kind      String        // ask | offer
+  headline  String
+  body      String        @default("")
+  region    String        @default("")
+  orgName   String        @default("")
+  orgId     String?
+  org       Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
+  authorId  String
+  author    User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+
+  @@index([createdAt])
+}
+
 model Intro {
   id            String    @id @default(cuid())
   requesterId   String

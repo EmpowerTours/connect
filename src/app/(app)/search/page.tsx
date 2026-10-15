@@ -4,7 +4,6 @@ import { OrgLogo, UserAvatar } from "@/components/avatar";
 import { DemoBadge } from "@/components/badges";
 import { Columns, PageHeader } from "@/components/layout";
 import { PostCard } from "@/components/post-card";
-import { RightRail } from "@/components/right-rail";
 import { getLocale, requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { postInclude } from "@/lib/feed";
@@ -30,7 +29,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   const head = "px-4 pb-2 pt-5 text-[13px] font-semibold uppercase tracking-wide text-faint";
 
   return (
-    <Columns rail={<RightRail viewerId={user.id} locale={locale} />}>
+    <Columns>
       <PageHeader title={t(locale, "search.title")}>
         <form className="px-4 pb-3">
           <div className="relative">
@@ -43,7 +42,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
         <section>
           <h2 className={head}>{t(locale, "search.people")}</h2>
           {people.map((p) => (
-            <Link key={p.id} href={`/u/${p.handle}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.02]">
+            <Link key={p.id} href={`/u/${p.handle}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-black/[0.03]">
               <UserAvatar name={p.name} seed={p.handle} size={40} />
               <span className="min-w-0">
                 <span className="flex items-center gap-1.5 font-semibold">{p.name} {p.isDemo && <DemoBadge locale={locale} />}</span>
@@ -59,7 +58,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
           <Link href={q ? `/orgs?q=${encodeURIComponent(q)}` : "/orgs"} className="normal-case tracking-normal text-accent">{t(locale, "search.allOrgs")}</Link>
         </h2>
         {orgs.map((o) => (
-          <Link key={o.id} href={`/orgs/${o.slug}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.02]">
+          <Link key={o.id} href={`/orgs/${o.slug}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-black/[0.03]">
             <OrgLogo slug={o.slug} name={o.name} size={40} />
             <span className="min-w-0">
               <span className="block font-semibold">{o.name}</span>
@@ -77,7 +76,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
         <section>
           <h2 className={head}>{t(locale, "nav.channels")}</h2>
           {channels.map((c) => (
-            <Link key={c.id} href={`/channels/${c.slug}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.02]">
+            <Link key={c.id} href={`/channels/${c.slug}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-black/[0.03]">
               <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-accent-soft text-accent"><Hash size={18} /></span>
               <span><span className="block font-semibold">/{c.slug}</span><span className="block text-sm text-faint">{c.description}</span></span>
             </Link>

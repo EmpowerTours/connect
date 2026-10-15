@@ -58,7 +58,7 @@ export async function RightRail({ viewerId, locale }: { viewerId: string; locale
         <ul className="py-1">
           {channels.map((c, i) => (
             <li key={c.slug}>
-              <Link href={`/channels/${c.slug}`} className="flex items-center gap-3 px-4 py-2.5 transition hover:bg-white/[0.03]">
+              <Link href={`/channels/${c.slug}`} className="flex items-center gap-3 px-4 py-2.5 transition hover:bg-black/[0.03]">
                 <span className="w-4 text-sm tabular-nums text-faint">{i + 1}</span>
                 <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-accent-soft text-accent">
                   <Hash size={17} />
@@ -108,7 +108,7 @@ export async function RightRail({ viewerId, locale }: { viewerId: string; locale
             const org = s.orgs[0]?.org;
             return (
               <li key={s.id}>
-                <a href={s.url ?? "#"} target="_blank" rel="noreferrer" className="flex gap-3 px-4 py-2.5 transition hover:bg-white/[0.03]">
+                <a href={s.url ?? "#"} target="_blank" rel="noreferrer" className="flex gap-3 px-4 py-2.5 transition hover:bg-black/[0.03]">
                   {org && <OrgLogo slug={org.slug} name={org.name} size={28} />}
                   <span className="min-w-0">
                     <span className="block text-xs text-faint">

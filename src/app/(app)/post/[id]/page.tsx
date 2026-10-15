@@ -3,7 +3,6 @@ import { UserAvatar } from "@/components/avatar";
 import { Composer } from "@/components/composer";
 import { Columns, PageHeader } from "@/components/layout";
 import { PostCard } from "@/components/post-card";
-import { RightRail } from "@/components/right-rail";
 import { getLocale, requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { postInclude } from "@/lib/feed";
@@ -38,8 +37,8 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
   const replies = subtree ? flattenThread(subtree, 3).slice(1) : [];
 
   return (
-    <Columns rail={<RightRail viewerId={user.id} locale={locale} />}>
-      <PageHeader title={t(locale, "post.thread")} back="/" />
+    <Columns>
+      <PageHeader title={t(locale, "post.thread")} back="/more" />
       {ancestors.map((a, i) => (
         <PostCard key={a.id} item={{ key: a.id, post: a, at: a.createdAt }} ctx={ctx} variant="thread" connector={i === 0 ? "bottom" : "both"} />
       ))}

@@ -8,7 +8,6 @@ import { OrgFacts, PrivateDealPanel } from "@/components/deal-panel";
 import { EmptyState } from "@/components/empty-state";
 import { Columns, PageHeader, Tabs } from "@/components/layout";
 import { PostCard } from "@/components/post-card";
-import { RightRail } from "@/components/right-rail";
 import { SubmitButton } from "@/components/submit-button";
 import { timeAgo } from "@/components/time";
 import { getLocale, getWorkspace, requireUser } from "@/lib/auth";
@@ -59,7 +58,7 @@ export default async function OrgPage({ params, searchParams }: { params: Promis
   ]);
 
   return (
-    <Columns rail={<RightRail viewerId={user.id} locale={locale} />}>
+    <Columns>
       <PageHeader title={org.name} subtitle={ORG_TYPE_LABELS[locale][org.type]} back="/orgs" />
       <section className="border-b border-line">
         <div className="h-24 bg-[linear-gradient(135deg,rgb(124_92_255/0.35),rgb(124_92_255/0.05)_60%,transparent)] sm:h-28" />
