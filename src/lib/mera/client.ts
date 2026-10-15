@@ -3,7 +3,9 @@
  * Browser half of Mera passkey sign-in. Mirrors Hunt's lib/auth/passkey.ts +
  * lib/auth/signIn.ts:
  *
- *   1. WebAuthn ceremony (Mera) -> 32 PRF bytes for (credential, rpId, PRF_SALT)
+ *   1. WebAuthn ceremony (Mera) -> 32 PRF bytes for (credential, rpId, EMPOWERTOURS_PRF_SALT)
+ *      Same rpId (empowertours.xyz) and salt as Hunt and TURBO, so the same
+ *      passkey is the same wallet in every EmpowerTours app.
  *   2. PRF -> BIP-39 -> m/44'/60'/0'/0/0 secp256k1 key -> Mera signing session
  *   3. sign an EIP-712 Session message (off-chain; NOT a transaction)
  *   4. POST /api/auth/session -> HttpOnly session cookie
@@ -24,7 +26,7 @@ import {
 import { toViemAccount } from "@category-labs/mera/viem";
 import type { LocalAccount } from "viem";
 import { APP_FULL_NAME, BRAND } from "../brand";
-import { PRF_SALT, assertOwnRelyingParty, isUsableCredentialId, walletFromPrfOutput } from "./derive";
+import { EMPOWERTOURS_PRF_SALT, assertOwnRelyingParty, isUsableCredentialId, walletFromPrfOutput } from "./derive";
 import { LINK_STATEMENT, SESSION_STATEMENT, registrationTypedData, sessionTypedData } from "./typed-data";
 
 /** Same env name as Hunt. "localhost" for local dev. */
@@ -102,6 +104,15 @@ function forgetCredential(): void {
   } catch {
     /* ignore */
   }
+  // Clear the shared cookie too (as Hunt does), or a stale id outlives the reset.
+  const domain = cookieDomain();
+  if (domain) {
+    try {
+      document.cookie = `${CREDENTIAL_COOKIE}=; domain=${domain}; path=/; max-age=0; secure; samesite=lax`;
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 export interface PasskeyAccount {
@@ -129,7 +140,7 @@ async function createAccount(displayName: string): Promise<PasskeyAccount> {
     createPasskeyWithPrfOutput({
       rp: { id: RP_ID, name: APP_FULL_NAME },
       user: { name: displayName, displayName },
-      prfSalt: PRF_SALT,
+      prfSalt: EMPOWERTOURS_PRF_SALT,
       timeout: CEREMONY_TIMEOUT_MS,
     }),
   );
@@ -142,7 +153,7 @@ async function signInAccount(): Promise<PasskeyAccount> {
   assertOwnRelyingParty(RP_ID);
   const known = storedCredential();
   const lookup = (credential: PasskeyCredentialMetadata | undefined) =>
-    withGuard(getPasskeyPrfOutput({ rpId: RP_ID, credential, prfSalt: PRF_SALT, timeout: CEREMONY_TIMEOUT_MS }));
+    withGuard(getPasskeyPrfOutput({ rpId: RP_ID, credential, prfSalt: EMPOWERTOURS_PRF_SALT, timeout: CEREMONY_TIMEOUT_MS }));
   let out: { prfOutput: Uint8Array; credentialId: string };
   try {
     out = await lookup(known);

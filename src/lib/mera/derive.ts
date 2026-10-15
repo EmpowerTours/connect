@@ -13,15 +13,36 @@ import { sha256, stringToBytes } from "viem";
 export const ACCOUNT_PATH = "m/44'/60'/0'/0/0";
 
 /**
- * This app's own 32-byte WebAuthn PRF salt. Distinct from Hunt's
- * ("empowertours-hunt/passkey/v1") so the same passkey yields a different
- * wallet here, even under the shared parent rpId empowertours.xyz.
+ * The EmpowerTours-wide 32-byte WebAuthn PRF salt, shared on purpose.
  *
- * It MUST NEVER CHANGE — not even on a brand rename (which is why it is not
- * built from BRAND). tests/mera.test.ts pins the bytes.
+ * Every EmpowerTours app (Hunt, TURBO, fcempowertours, Connect, and Regalo once
+ * migrated) derives the wallet from the SAME passkey under the SAME relying-party
+ * id (`empowertours.xyz`) with THIS salt, so one person has ONE address across the
+ * ecosystem: a Hunt player or TURBO builder arrives on Connect already verified
+ * as the same wallet.
+ *
+ * The label is Hunt's, byte for byte ("empowertours-hunt/passkey/v1"), because
+ * Hunt and TURBO already have users under it. It is not renamed to something
+ * neutral: a different label is a different PRF output is a different wallet for
+ * every existing person. tests/mera.test.ts pins the exact bytes and checks the
+ * derived address against Hunt's published test vector.
+ *
+ * It MUST NEVER CHANGE, not even on a brand rename (which is why it is not built
+ * from BRAND).
+ *
+ * Safe to share here because Connect holds no funds and only ever asks this key
+ * for off-chain EIP-712 sign-in signatures (domain "EmpowerToursConnect", so a
+ * Connect signature can never be replayed against Hunt's or TURBO's domain).
  */
-export const PRF_SALT_LABEL = "empowertours-connect/passkey/v1";
-export const PRF_SALT: Uint8Array = sha256(stringToBytes(PRF_SALT_LABEL), "bytes");
+export const EMPOWERTOURS_PRF_SALT_LABEL = "empowertours-hunt/passkey/v1";
+export const EMPOWERTOURS_PRF_SALT: Uint8Array = sha256(stringToBytes(EMPOWERTOURS_PRF_SALT_LABEL), "bytes");
+
+/**
+ * The shared parent relying-party id. A passkey is bound to its rpId, so the
+ * shared salt only yields the shared wallet when the CREDENTIAL is shared too,
+ * i.e. when every app runs its ceremonies under this parent domain.
+ */
+export const EMPOWERTOURS_RP_ID = "empowertours.xyz";
 
 export interface DerivedWallet {
   mnemonic: string;
@@ -45,20 +66,38 @@ export function isUsableCredentialId(id: unknown): id is string {
   return typeof id === "string" && id.length > 0 && id.length <= 256 && id.length % 4 !== 1 && BASE64URL.test(id);
 }
 
-/** Relying-party guard, mirroring Hunt's assertOwnRelyingParty. */
-export const FOREIGN_RP_IDS = ["hunt.empowertours.xyz", "regalo.empowertours.xyz"];
-export const PARENT_RP_IDS = ["empowertours.xyz"];
-const EXPECTED_SALT_LABEL = "empowertours-connect/passkey/v1";
+/**
+ * Pinned here, apart from EMPOWERTOURS_PRF_SALT_LABEL above, so editing that
+ * label cannot silently move this check with it.
+ */
+const EXPECTED_SALT_LABEL = "empowertours-hunt/passkey/v1";
 
-export function assertOwnRelyingParty(rpId: string, saltLabel: string = PRF_SALT_LABEL): void {
+/**
+ * Relying-party guard.
+ *
+ * - `empowertours.xyz` (the shared parent) is the production value. The salt is
+ *   re-checked against an independently pinned label, because under a parent
+ *   rpId a wrong salt would hand every user a wallet that is NOT their
+ *   EmpowerTours wallet, silently and permanently.
+ * - Any `*.empowertours.xyz` host rpId (connect., hunt., regalo., ...) is refused:
+ *   it would mint a per-host credential and therefore a different wallet from the
+ *   one the person uses in Hunt and TURBO, which defeats the shared identity.
+ * - Anything else (localhost, a tunnel or preview host) is allowed for local
+ *   testing; credentials there are bound to that host and are not the ecosystem
+ *   wallet.
+ */
+export function assertOwnRelyingParty(rpId: string, saltLabel: string = EMPOWERTOURS_PRF_SALT_LABEL): void {
   const id = rpId.toLowerCase();
-  if (FOREIGN_RP_IDS.includes(id)) {
-    throw new Error(`NEXT_PUBLIC_RP_ID is set to ${rpId}, which belongs to another EmpowerTours app.`);
-  }
-  if (PARENT_RP_IDS.includes(id) && saltLabel !== EXPECTED_SALT_LABEL) {
+  if (id.endsWith(`.${EMPOWERTOURS_RP_ID}`)) {
     throw new Error(
-      `NEXT_PUBLIC_RP_ID is ${rpId} (shared across EmpowerTours subdomains) but the PRF salt label is "${saltLabel}"; ` +
-        "under a parent rpId the salt is the only thing keeping this app's wallets apart.",
+      `NEXT_PUBLIC_RP_ID is set to ${rpId}, a single EmpowerTours host. Use the shared parent ` +
+        `"${EMPOWERTOURS_RP_ID}" so the passkey (and therefore the wallet) is the same one used across EmpowerTours apps.`,
+    );
+  }
+  if (id === EMPOWERTOURS_RP_ID && saltLabel !== EXPECTED_SALT_LABEL) {
+    throw new Error(
+      `NEXT_PUBLIC_RP_ID is ${rpId} (shared across EmpowerTours subdomains) but the PRF salt label is "${saltLabel}" ` +
+        `rather than "${EXPECTED_SALT_LABEL}"; users would get a different wallet from their EmpowerTours one.`,
     );
   }
 }

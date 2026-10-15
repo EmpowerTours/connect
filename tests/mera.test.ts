@@ -12,7 +12,15 @@ import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { bytesToHex } from "viem";
 import { APP_FULL_NAME, APP_HOST, APP_NAME, APP_URL, BRAND } from "@/lib/brand";
 import { handleFromName } from "@/lib/auth-core";
-import { PRF_SALT, PRF_SALT_LABEL, assertOwnRelyingParty, isUsableCredentialId, walletFromPrfOutput } from "@/lib/mera/derive";
+import {
+  ACCOUNT_PATH,
+  EMPOWERTOURS_PRF_SALT,
+  EMPOWERTOURS_PRF_SALT_LABEL,
+  EMPOWERTOURS_RP_ID,
+  assertOwnRelyingParty,
+  isUsableCredentialId,
+  walletFromPrfOutput,
+} from "@/lib/mera/derive";
 import { linkFlow, loginFlow, registerFlow, type AuthDeps, type AuthUserRef } from "@/lib/mera/flows";
 import { shortAddress } from "@/lib/mera/format";
 import {
@@ -81,10 +89,16 @@ describe("brand config", () => {
 });
 
 describe("passkey key derivation", () => {
-  it("pins this app's PRF salt (changing it would orphan every wallet)", () => {
-    expect(PRF_SALT_LABEL).toBe("empowertours-connect/passkey/v1");
-    expect(PRF_SALT).toHaveLength(32);
-    expect(bytesToHex(PRF_SALT)).toBe(PINNED_SALT_HEX);
+  it("pins the shared EmpowerTours PRF salt to Hunt's exact bytes (changing it would orphan every wallet)", () => {
+    expect(EMPOWERTOURS_PRF_SALT_LABEL).toBe("empowertours-hunt/passkey/v1");
+    expect(EMPOWERTOURS_PRF_SALT).toHaveLength(32);
+    // Same hex as Hunt's lib/auth/derive.test.ts and TURBO's derive.ts.
+    expect(bytesToHex(EMPOWERTOURS_PRF_SALT)).toBe(PINNED_SALT_HEX);
+  });
+
+  it("uses the shared parent rpId and the standard first account", () => {
+    expect(EMPOWERTOURS_RP_ID).toBe("empowertours.xyz");
+    expect(ACCOUNT_PATH).toBe("m/44'/60'/0'/0/0");
   });
 
   it("maps 32 PRF bytes deterministically to an ordinary EVM account", () => {
@@ -101,13 +115,18 @@ describe("passkey key derivation", () => {
     expect(() => walletFromPrfOutput(new Uint8Array(16))).toThrow(/32 bytes/);
   });
 
-  it("guards the relying-party id like Hunt", () => {
+  it("allows the shared parent rpId and local hosts, refuses per-host EmpowerTours rpIds", () => {
     expect(() => assertOwnRelyingParty("localhost")).not.toThrow();
-    expect(() => assertOwnRelyingParty("connect.empowertours.xyz")).not.toThrow();
     expect(() => assertOwnRelyingParty("empowertours.xyz")).not.toThrow();
-    expect(() => assertOwnRelyingParty("hunt.empowertours.xyz")).toThrow(/another EmpowerTours app/);
-    expect(() => assertOwnRelyingParty("regalo.empowertours.xyz")).toThrow();
-    expect(() => assertOwnRelyingParty("empowertours.xyz", "empowertours-hunt/passkey/v1")).toThrow(/salt/);
+    expect(() => assertOwnRelyingParty("EmpowerTours.xyz")).not.toThrow();
+    expect(() => assertOwnRelyingParty("abc123.ngrok-free.app")).not.toThrow();
+    // A per-host rpId mints a per-host credential, i.e. a DIFFERENT wallet from Hunt/TURBO.
+    for (const host of ["connect.empowertours.xyz", "hunt.empowertours.xyz", "regalo.empowertours.xyz"]) {
+      expect(() => assertOwnRelyingParty(host)).toThrow(/shared parent/);
+    }
+    // Under the parent rpId the salt must be the ecosystem one.
+    expect(() => assertOwnRelyingParty("empowertours.xyz", "empowertours-connect/passkey/v1")).toThrow(/salt/);
+    expect(() => assertOwnRelyingParty("empowertours.xyz", "empowertours-hunt/passkey/v1")).not.toThrow();
   });
 
   it("validates credential ids", () => {
@@ -353,4 +372,4 @@ describe("helpers", () => {
   });
 });
 
-const PINNED_SALT_HEX = "0x9daa479e1a712e0dc083b8bdd852d079bf8ca8f5d55940dca49adabc11515e08";
+const PINNED_SALT_HEX = "0x9fc345cea9c77d56f4238d9940dfdc757b6a69fb1d83893e067cefbeda0f648f";
