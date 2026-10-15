@@ -7,5 +7,5 @@ export async function GET(req: NextRequest) {
   if (!email) return NextResponse.redirect(new URL("/login?error=link", req.url));
   const user = await ensureUser(email);
   await createSession(user.id);
-  return NextResponse.redirect(new URL("/pipeline", req.url));
+  return NextResponse.redirect(new URL("/", req.url));
 }

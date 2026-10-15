@@ -6,6 +6,7 @@ import { moveDealAction } from "@/app/actions";
 import type { Locale } from "@/lib/i18n";
 import { ORG_TYPE_LABELS, t } from "@/lib/i18n";
 import { STAGES, canTransition, nextStage, prevStage, type DueStatus, type Stage } from "@/lib/pipeline";
+import { OrgLogo } from "./avatar";
 import { DueChip, STAGE_COLORS } from "./ui";
 
 export interface KanbanCard {
@@ -63,7 +64,7 @@ export function Kanban({ cards, locale }: { cards: KanbanCard[]; locale: Locale 
                 setDragging(null);
               }}
               className={`card flex w-[82vw] max-w-[300px] shrink-0 snap-start flex-col sm:w-[260px] xl:w-auto xl:max-w-none xl:min-w-0 xl:flex-1 xl:shrink ${
-                droppable ? "border-violet-500/60 bg-violet-500/5" : ""
+                droppable ? "border-accent/60 bg-accent-soft" : ""
               } ${stage === "lost" ? "opacity-80" : ""}`}
             >
               <header className="flex items-center justify-between border-b border-line px-3 py-2.5">
@@ -71,10 +72,10 @@ export function Kanban({ cards, locale }: { cards: KanbanCard[]; locale: Locale 
                   <span className={`h-2 w-2 rounded-full ${STAGE_COLORS[stage]}`} />
                   {t(locale, `stage.${stage}`)}
                 </span>
-                <span className="text-xs text-zinc-500">{col.length}</span>
+                <span className="text-xs text-faint">{col.length}</span>
               </header>
               <div className="flex min-h-32 flex-1 flex-col gap-2 p-2">
-                {col.length === 0 && <p className="p-3 text-center text-xs text-zinc-600">{t(locale, "pipeline.empty")}</p>}
+                {col.length === 0 && <p className="p-3 text-center text-xs text-faint">{t(locale, "pipeline.empty")}</p>}
                 {col.map((c) => {
                   const prev = prevStage(c.stage);
                   const next = nextStage(c.stage);
@@ -84,23 +85,26 @@ export function Kanban({ cards, locale }: { cards: KanbanCard[]; locale: Locale 
                       draggable
                       onDragStart={() => setDragging(c.id)}
                       onDragEnd={() => setDragging(null)}
-                      className="cursor-grab rounded-lg border border-line bg-bg p-3 active:cursor-grabbing"
+                      className="cursor-grab rounded-lg border border-line bg-raised p-3 active:cursor-grabbing"
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <Link href={`/orgs/${c.orgSlug}`} className="font-medium hover:text-violet-300">
-                          {c.orgName}
-                        </Link>
-                        <span className="shrink-0 text-[10px] uppercase tracking-wide text-zinc-500">{ORG_TYPE_LABELS[locale][c.orgType]}</span>
+                      <div className="flex items-center gap-2.5">
+                        <OrgLogo slug={c.orgSlug} name={c.orgName} size={28} />
+                        <div className="min-w-0">
+                          <Link href={`/orgs/${c.orgSlug}?tab=deal`} className="block truncate text-sm font-semibold leading-tight hover:text-accent">
+                            {c.orgName}
+                          </Link>
+                          <span className="block truncate text-[11px] text-faint">{ORG_TYPE_LABELS[locale][c.orgType]}</span>
+                        </div>
                       </div>
-                      {c.useCase && <p className="mt-1 text-xs text-zinc-400">{c.useCase}</p>}
+                      {c.useCase && <p className="mt-2 text-xs text-muted">{c.useCase}</p>}
                       <div className="mt-2 space-y-1.5">
-                        <p className="text-xs text-zinc-300">
-                          <span className="text-zinc-500">→ </span>
+                        <p className="text-xs text-fg/90">
+                          <span className="text-faint">→ </span>
                           {c.nextAction || <em className="text-rose-300/80">{locale === "es" ? "Sin siguiente acción" : "No next action"}</em>}
                         </p>
                         <div className="flex flex-wrap gap-1">
                           <DueChip status={c.dueStatus} date={c.due ? new Date(c.due) : null} locale={locale} />
-                          {c.champion && <span className="chip border-emerald-500/40 text-emerald-300">★ {c.champion}</span>}
+                          {c.champion && <span className="chip border-success/40 text-success">★ {c.champion}</span>}
                           {c.competing.map((ch) => (
                             <span key={ch} className="chip border-rose-500/30 text-rose-200">vs {ch}</span>
                           ))}
@@ -111,7 +115,7 @@ export function Kanban({ cards, locale }: { cards: KanbanCard[]; locale: Locale 
                           type="button"
                           disabled={!prev}
                           onClick={() => prev && move(c, prev)}
-                          className="rounded px-2 py-0.5 text-xs text-zinc-400 hover:bg-white/5 disabled:invisible"
+                          className="rounded px-2 py-0.5 text-xs text-muted hover:bg-white/5 disabled:invisible"
                           aria-label="Move back"
                         >
                           ←
@@ -120,12 +124,12 @@ export function Kanban({ cards, locale }: { cards: KanbanCard[]; locale: Locale 
                           <button
                             type="button"
                             onClick={() => move(c, "lost")}
-                            className="rounded px-2 py-0.5 text-[11px] text-zinc-600 hover:text-rose-300"
+                            className="rounded px-2 py-0.5 text-[11px] text-faint hover:text-rose-300"
                           >
                             {t(locale, "stage.lost")}
                           </button>
                         ) : (
-                          <button type="button" onClick={() => move(c, "awareness")} className="rounded px-2 py-0.5 text-[11px] text-zinc-500 hover:text-white">
+                          <button type="button" onClick={() => move(c, "awareness")} className="rounded px-2 py-0.5 text-[11px] text-faint hover:text-white">
                             ↺ {t(locale, "stage.awareness")}
                           </button>
                         )}
@@ -133,7 +137,7 @@ export function Kanban({ cards, locale }: { cards: KanbanCard[]; locale: Locale 
                           type="button"
                           disabled={!next}
                           onClick={() => next && move(c, next)}
-                          className="rounded px-2 py-0.5 text-xs text-zinc-300 hover:bg-white/5 disabled:invisible"
+                          className="rounded px-2 py-0.5 text-xs text-fg/90 hover:bg-white/5 disabled:invisible"
                           aria-label="Move forward"
                         >
                           →

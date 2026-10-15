@@ -1,4 +1,4 @@
-import type { ScoutInput, ScoutProvider, ScoutResult } from "./types";
+import type { IntroDraftInput, IntroDraftResult, ScoutInput, ScoutProvider, ScoutResult } from "./types";
 
 type Copy = { fit: string; angles: string[] };
 
@@ -94,5 +94,41 @@ export class MockScoutProvider implements ScoutProvider {
     const subject = es ? `${org.name} × ${sender.orgName || "nosotros"}: ${copy.angles[0]}` : `${org.name} × ${sender.orgName || "us"}: ${copy.angles[0]}`;
 
     return { provider: this.name, fit, angles: copy.angles, subject, draft };
+  }
+
+  async draftIntro(input: IntroDraftInput): Promise<IntroDraftResult> {
+    const es = input.locale === "es";
+    const { requester, connector, target } = input;
+    const voice = requester.voice.toLowerCase();
+    const short = /short|brief|direct|corto|breve|directo/.test(voice);
+    const c = firstName(connector.name) || connector.name;
+    const tFirst = firstName(target.name) || target.name;
+    const targetDesc = [target.headline, target.orgName].filter(Boolean).join(es ? " en " : " at ");
+    const reason = input.reason.trim() || (es ? "explorar una posible colaboración" : "explore a possible collaboration");
+    const topics = input.sharedTopics.length ? input.sharedTopics.slice(0, 3).join(", ") : "";
+    const lines = es
+      ? [
+          `Hola ${c},`,
+          "",
+          `¿Te sentirías cómodo/a presentándome con ${tFirst}${targetDesc ? ` (${targetDesc})` : ""}? Te cuento el motivo: ${reason.replace(/^./, (x) => x.toLowerCase()).replace(/[.\s]+$/, "")}.`,
+          ...(topics && !short ? ["", `Ambos estamos siguiendo ${topics}, así que creo que la conversación sería útil para los dos.`] : []),
+          "",
+          "Si te parece bien, puedo enviarte un párrafo corto para reenviar. Y si no es buen momento, sin problema.",
+          "",
+          "¡Gracias!",
+          requester.name,
+        ]
+      : [
+          `Hi ${c},`,
+          "",
+          `Would you be comfortable introducing me to ${tFirst}${targetDesc ? ` (${targetDesc})` : ""}? Here's why I'm asking: ${reason.replace(/^./, (x) => x.toLowerCase()).replace(/[.\s]+$/, "")}.`,
+          ...(topics && !short ? ["", `We're both following ${topics}, so I think it'd be a useful conversation for both sides.`] : []),
+          "",
+          "Happy to send a short forwardable blurb. And no worries at all if the timing isn't right.",
+          "",
+          "Thanks!",
+          requester.name,
+        ];
+    return { provider: this.name, message: lines.join("\n") };
   }
 }

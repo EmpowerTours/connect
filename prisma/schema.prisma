@@ -28,7 +28,24 @@ model User {
   /// Placeholder for future wallet / Farcaster / LinkedIn verification.
   verified           Boolean  @default(false)
   verificationMethod String?
+  /// Clearly-labelled fictional seed account.
+  isDemo             Boolean  @default(false)
+  headline           String   @default("")
+  location           String   @default("")
+  /// Proof placeholders — all false until real verification ships.
+  workEmailVerified  Boolean  @default(false)
+  linkedinVerified   Boolean  @default(false)
+  walletAddress      String   @default("")
+  walletVerified     Boolean  @default(false)
   createdAt          DateTime @default(now())
+
+  likes            Like[]
+  recasts          Recast[]
+  mentionedIn      PostMention[]
+  channels         ChannelMember[]
+  introsRequested  Intro[] @relation("IntroRequester")
+  introsConnecting Intro[] @relation("IntroConnector")
+  introsTargeted   Intro[] @relation("IntroTarget")
 
   sessions     Session[]
   workspaces   Workspace[]
@@ -72,6 +89,8 @@ model Organization {
   /// JSON string[]
   chainsEvaluating String   @default("[]")
   notes            String   @default("")
+  /// Placeholder: org verification (domain / admin claim) not implemented yet.
+  verified         Boolean  @default(false)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -206,8 +225,99 @@ model Post {
   authorId  String
   author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
   body      String
+  /// "", looking_for_partner, launch, hiring, insight
+  kind      String   @default("")
+  parentId  String?
+  parent    Post?    @relation("Replies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Post[]   @relation("Replies")
+  rootId    String?
+  quoteOfId String?
+  quoteOf   Post?    @relation("Quotes", fields: [quoteOfId], references: [id], onDelete: SetNull)
+  quotes    Post[]   @relation("Quotes")
+  channelId String?
+  channel   Channel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
   orgs      PostOrg[]
+  mentions  PostMention[]
+  likes     Like[]
+  recasts   Recast[]
+
+  @@index([rootId])
+  @@index([createdAt])
+}
+
+model PostMention {
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([postId, userId])
+}
+
+model Like {
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, postId])
+}
+
+model Recast {
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, postId])
+}
+
+model Channel {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String   @default("")
+  createdAt   DateTime @default(now())
+  members     ChannelMember[]
+  posts       Post[]
+}
+
+model ChannelMember {
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channelId String
+  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, channelId])
+}
+
+/// Warm intro: requester asks connector (a mutual connection) to introduce them to target.
+model Intro {
+  id            String    @id @default(cuid())
+  requesterId   String
+  requester     User      @relation("IntroRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  connectorId   String
+  connector     User      @relation("IntroConnector", fields: [connectorId], references: [id], onDelete: Cascade)
+  targetId      String
+  target        User      @relation("IntroTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  reason        String    @default("")
+  /// The ask to the connector (AI-drafted, editable)
+  message       String    @default("")
+  provider      String    @default("")
+  /// draft | pending | accepted | declined | withdrawn
+  status        String    @default("draft")
+  /// Note the connector forwards to the target when accepting (or a reason when declining)
+  connectorNote String    @default("")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  respondedAt   DateTime?
+
+  @@index([connectorId, status])
+  @@index([requesterId, status])
 }
 
 model PostOrg {

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Lock } from "lucide-react";
 import { Kanban, type KanbanCard } from "@/components/kanban";
 import { DueChip, Section } from "@/components/ui";
 import { getLocale, getWorkspace, requireUser } from "@/lib/auth";
@@ -38,48 +39,48 @@ export default async function PipelinePage() {
   const counts = stageCounts(deals);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-4 py-5 md:px-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t(locale, "pipeline.title")}</h1>
-          <p className="mt-1 flex flex-wrap gap-3 text-sm text-zinc-400">
+          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">{t(locale, "nav.deals")} <span className="inline-flex items-center gap-1 rounded-full border border-line px-2 py-0.5 text-xs font-medium text-faint"><Lock size={11} /> {t(locale, "pipeline.private")}</span></h1>
+          <p className="mt-1 flex flex-wrap gap-3 text-sm text-muted">
             {ACTIVE_STAGES.map((s) => (
               <span key={s}>
-                {t(locale, `stage.${s}`)} <b className="text-zinc-200">{counts[s]}</b>
+                {t(locale, `stage.${s}`)} <b className="text-fg">{counts[s]}</b>
               </span>
             ))}
           </p>
         </div>
-        <Link href="/directory" className="btn-ghost">+ {t(locale, "pipeline.addFromDirectory")}</Link>
+        <Link href="/orgs" className="btn-secondary">+ {t(locale, "pipeline.addFromDirectory")}</Link>
       </div>
 
       <Kanban cards={cards} locale={locale} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Section title={`${t(locale, "pipeline.attention")} (${attention.length})`}>
-          <p className="mb-3 text-xs text-zinc-500">{t(locale, "pipeline.attentionHint")}</p>
+          <p className="mb-3 text-xs text-faint">{t(locale, "pipeline.attentionHint")}</p>
           <ul className="divide-y divide-line">
             {attention.map((d) => (
               <li key={d.id} className="flex items-center justify-between gap-2 py-2 text-sm">
-                <Link href={`/orgs/${d.org.slug}`} className="font-medium hover:text-violet-300">{d.org.name}</Link>
-                <span className="flex items-center gap-2 truncate text-xs text-zinc-400">
+                <Link href={`/orgs/${d.org.slug}?tab=deal`} className="font-medium hover:text-accent">{d.org.name}</Link>
+                <span className="flex items-center gap-2 truncate text-xs text-muted">
                   <span className="hidden truncate sm:inline">{d.nextAction || "—"}</span>
                   <DueChip status={dueStatus(d.nextActionDue, now)} date={d.nextActionDue} locale={locale} />
                 </span>
               </li>
             ))}
-            {attention.length === 0 && <li className="py-2 text-sm text-zinc-500">✓</li>}
+            {attention.length === 0 && <li className="py-2 text-sm text-faint">✓</li>}
           </ul>
         </Section>
         <Section title={t(locale, "pipeline.competing")}>
           {competing.length === 0 ? (
-            <p className="text-sm text-zinc-500">{t(locale, "pipeline.noCompeting")}</p>
+            <p className="text-sm text-faint">{t(locale, "pipeline.noCompeting")}</p>
           ) : (
             <ul className="space-y-2">
               {competing.map((c) => (
                 <li key={c.chain} className="text-sm">
                   <span className="chip mr-2 border-rose-500/40 text-rose-200">{c.chain}</span>
-                  <span className="text-zinc-300">{c.orgs.join(", ")}</span>
+                  <span className="text-fg/90">{c.orgs.join(", ")}</span>
                 </li>
               ))}
             </ul>

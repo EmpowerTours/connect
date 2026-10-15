@@ -1,0 +1,69 @@
+import { BadgeCheck, BriefcaseBusiness, IdCard, Mail, Rocket, Search, Sparkles, Wallet } from "lucide-react";
+import { t, type Locale } from "@/lib/i18n";
+import type { PostKind } from "@/lib/posts";
+
+export function DemoBadge({ locale, className = "" }: { locale: Locale; className?: string }) {
+  return (
+    <span
+      title={t(locale, "demo.tooltip")}
+      className={`inline-flex items-center rounded-md border border-amber-400/30 bg-amber-400/10 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-amber-300 ${className}`}
+    >
+      {t(locale, "demo.badge")}
+    </span>
+  );
+}
+
+const KIND_ICON: Record<PostKind, typeof Search> = {
+  looking_for_partner: Search,
+  launch: Rocket,
+  hiring: BriefcaseBusiness,
+  insight: Sparkles,
+};
+
+export function PostKindChip({ kind, locale }: { kind: string; locale: Locale }) {
+  if (!(kind in KIND_ICON)) return null;
+  const Icon = KIND_ICON[kind as PostKind];
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-violet-200">
+      <Icon size={11} strokeWidth={2.4} />
+      {t(locale, `kind.${kind as PostKind}`)}
+    </span>
+  );
+}
+
+
+/** Small inline check shown next to names when any proof is verified. */
+export function VerifiedTick({ verified }: { verified: boolean }) {
+  return verified ? <BadgeCheck size={16} className="shrink-0 text-accent" aria-label="Verified" /> : null;
+}
+
+export function ProofBadges({
+  user,
+  locale,
+}: {
+  user: { workEmailVerified: boolean; linkedinVerified: boolean; walletVerified: boolean; walletAddress: string };
+  locale: Locale;
+}) {
+  const items = [
+    { key: "email", icon: Mail, label: t(locale, "proof.workEmail"), ok: user.workEmailVerified },
+    { key: "linkedin", icon: IdCard, label: "LinkedIn", ok: user.linkedinVerified },
+    { key: "wallet", icon: Wallet, label: t(locale, "proof.wallet"), ok: user.walletVerified },
+  ];
+  return (
+    <ul className="flex flex-wrap gap-1.5">
+      {items.map(({ key, icon: Icon, label, ok }) => (
+        <li
+          key={key}
+          title={ok ? t(locale, "proof.verified") : t(locale, "proof.unverifiedHint")}
+          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
+            ok ? "border-accent/40 bg-accent-soft text-violet-100" : "border-dashed border-line-strong text-faint"
+          }`}
+        >
+          <Icon size={13} />
+          {label}
+          <span className={ok ? "text-accent" : ""}>· {ok ? t(locale, "proof.verified") : t(locale, "proof.unverified")}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}

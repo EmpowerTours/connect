@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { devLoginAllowed, isValidEmail } from "@/lib/auth-core";
 import { LANG_COOKIE, createSession, destroySession, ensureUser, getCurrentUser, getWorkspace, issueMagicLink, requireUser } from "@/lib/auth";
-import { ADVISOR_INFLUENCE, ACTIVITY_KINDS, ORG_TYPES, POST_MAX_LENGTH, regionForCountry } from "@/lib/constants";
+import { ADVISOR_INFLUENCE, ACTIVITY_KINDS, ORG_TYPES, regionForCountry } from "@/lib/constants";
 import { prisma } from "@/lib/db";
 import { isLocale } from "@/lib/i18n";
 import { ingestAllFeeds } from "@/lib/ingest";
@@ -15,6 +15,8 @@ import { canTransition, isStage } from "@/lib/pipeline";
 import { getScoutProvider } from "@/lib/scout";
 import { slugify } from "@/lib/slug";
 import { extractCashtags, matchOrgs } from "@/lib/tagging";
+import { applyIntroAction, validateIntroRequest, type IntroAction } from "@/lib/intros";
+import { extractMentions, isPostKind, threadIdsFor, validatePostBody } from "@/lib/posts";
 
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
 
@@ -33,7 +35,7 @@ export async function devLoginAction() {
   if (!devLoginAllowed()) redirect("/login?error=dev");
   const user = await ensureUser("demo@corridor.local");
   await createSession(user.id);
-  redirect("/pipeline");
+  redirect("/");
 }
 
 export async function logoutAction() {
@@ -59,6 +61,7 @@ const profileSchema = z.object({
   orgName: z.string().max(80),
   bio: z.string().max(400),
   voice: z.string().max(400),
+  location: z.string().max(80),
   locale: z.enum(["en", "es"]),
 });
 
@@ -71,14 +74,15 @@ export async function updateProfileAction(fd: FormData) {
     orgName: str(fd, "orgName"),
     bio: str(fd, "bio"),
     voice: str(fd, "voice"),
+    location: str(fd, "location"),
     locale: str(fd, "locale") || "en",
   });
   const clash = await prisma.user.findFirst({ where: { handle: data.handle, NOT: { id: user.id } } });
   if (clash) redirect("/profile?error=handle");
   const org = data.orgName ? await prisma.organization.findFirst({ where: { name: data.orgName } }) : null;
-  await prisma.user.update({ where: { id: user.id }, data: { ...data, orgId: org?.id ?? null } });
+  await prisma.user.update({ where: { id: user.id }, data: { ...data, headline: data.role, orgId: org?.id ?? null } });
   revalidatePath("/", "layout");
-  redirect("/profile?saved=1");
+  redirect(`/u/${data.handle}?saved=1`);
 }
 
 export async function toggleFollowOrgAction(fd: FormData) {
@@ -165,6 +169,7 @@ export async function addToPipelineAction(fd: FormData) {
   });
   revalidatePath(`/orgs/${org.slug}`);
   revalidatePath("/pipeline");
+  redirect(`/orgs/${org.slug}?tab=deal`);
 }
 
 export async function moveDealAction(dealId: string, to: string): Promise<{ ok: boolean; error?: string }> {
@@ -291,7 +296,7 @@ export async function generateScoutAction(fd: FormData) {
     });
   } catch (err) {
     console.error("[scout]", err);
-    redirect(`/orgs/${org.slug}?scoutError=1`);
+    redirect(`/orgs/${org.slug}?tab=deal&scoutError=1`);
   }
   await prisma.scoutDraft.create({
     data: {
@@ -313,16 +318,141 @@ export async function generateScoutAction(fd: FormData) {
 
 /* ---------- feed ---------- */
 
-export async function createPostAction(fd: FormData) {
+export async function createPostAction(fd: FormData): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const user = await requireUser();
-  const body = str(fd, "body");
-  if (!body || body.length > POST_MAX_LENGTH) redirect("/feed?error=post");
+  const v = validatePostBody(String(fd.get("body") ?? ""));
+  if (!v.ok) return { ok: false, error: v.error };
+  const body = v.body;
+  const kindRaw = str(fd, "kind");
+  const parentId = str(fd, "parentId") || null;
+  const quoteOfId = str(fd, "quoteOfId") || null;
+  const parent = parentId ? await prisma.post.findUnique({ where: { id: parentId }, select: { id: true, rootId: true, channelId: true } }) : null;
+  if (parentId && !parent) return { ok: false, error: "parent_missing" };
+  if (quoteOfId && !(await prisma.post.findUnique({ where: { id: quoteOfId }, select: { id: true } }))) return { ok: false, error: "quote_missing" };
+  const channel = !parent && str(fd, "channel") ? await prisma.channel.findUnique({ where: { slug: str(fd, "channel") } }) : null;
+
   const orgs = await prisma.organization.findMany({ select: { id: true, slug: true, name: true, aliases: true } });
   const tagged = new Set(extractCashtags(body));
-  const ids = new Set(orgs.filter((o) => tagged.has(o.slug)).map((o) => o.id));
-  for (const o of matchOrgs(body, orgs)) ids.add(o.id);
-  await prisma.post.create({ data: { authorId: user.id, body, orgs: { create: [...ids].map((orgId) => ({ orgId })) } } });
-  revalidatePath("/feed");
+  const orgIds = new Set(orgs.filter((o) => tagged.has(o.slug)).map((o) => o.id));
+  for (const o of matchOrgs(body, orgs)) orgIds.add(o.id);
+  const handles = extractMentions(body);
+  const mentioned = handles.length ? await prisma.user.findMany({ where: { handle: { in: handles } }, select: { id: true } }) : [];
+  const { rootId } = threadIdsFor(parent ? { id: parent.id, rootId: parent.rootId } : null);
+
+  const post = await prisma.post.create({
+    data: {
+      authorId: user.id,
+      body,
+      kind: !parent && isPostKind(kindRaw) ? kindRaw : "",
+      parentId: parent?.id ?? null,
+      rootId,
+      quoteOfId,
+      channelId: channel?.id ?? null,
+      orgs: { create: [...orgIds].map((orgId) => ({ orgId })) },
+      mentions: { create: mentioned.map((m) => ({ userId: m.id })) },
+    },
+  });
+  revalidatePath("/", "layout");
+  return { ok: true, id: post.id };
+}
+
+export async function toggleLikeAction(postId: string) {
+  const user = await requireUser();
+  const key = { userId_postId: { userId: user.id, postId } };
+  if (await prisma.like.findUnique({ where: key })) await prisma.like.delete({ where: key });
+  else await prisma.like.create({ data: { userId: user.id, postId } });
+  revalidatePath("/", "layout");
+}
+
+export async function toggleRecastAction(postId: string) {
+  const user = await requireUser();
+  const key = { userId_postId: { userId: user.id, postId } };
+  if (await prisma.recast.findUnique({ where: key })) await prisma.recast.delete({ where: key });
+  else await prisma.recast.create({ data: { userId: user.id, postId } });
+  revalidatePath("/", "layout");
+}
+
+export async function toggleChannelAction(fd: FormData) {
+  const user = await requireUser();
+  const channelId = str(fd, "channelId");
+  const key = { userId_channelId: { userId: user.id, channelId } };
+  if (await prisma.channelMember.findUnique({ where: key })) await prisma.channelMember.delete({ where: key });
+  else await prisma.channelMember.create({ data: { userId: user.id, channelId } });
+  revalidatePath("/", "layout");
+}
+
+/* ---------- warm intros ---------- */
+
+export async function draftIntroAction(fd: FormData) {
+  const user = await requireUser();
+  const target = await prisma.user.findUniqueOrThrow({ where: { id: str(fd, "targetId") } });
+  const connectorId = str(fd, "connectorId");
+  const reason = str(fd, "reason").slice(0, 300);
+  const locale = str(fd, "locale") === "es" ? "es" : "en";
+  const back = `/u/${target.handle}?intro=1`;
+  const edges = await prisma.followUser.findMany({ select: { followerId: true, followeeId: true } });
+  const open = await prisma.intro.findMany({ where: { requesterId: user.id, targetId: target.id }, select: { requesterId: true, targetId: true, status: true } });
+  const err = validateIntroRequest({ requesterId: user.id, connectorId, targetId: target.id }, edges, open);
+  if (err) redirect(`${back}&error=${encodeURIComponent(err)}`);
+  const connector = await prisma.user.findUniqueOrThrow({ where: { id: connectorId } });
+  const [mine, theirs] = await Promise.all([
+    prisma.postOrg.findMany({ where: { post: { authorId: user.id } }, select: { org: { select: { name: true } } } }),
+    prisma.postOrg.findMany({ where: { post: { authorId: target.id } }, select: { org: { select: { name: true } } } }),
+  ]);
+  const theirOrgs = new Set(theirs.map((x) => x.org.name));
+  const sharedTopics = [...new Set(mine.map((x) => x.org.name).filter((n) => theirOrgs.has(n)))];
+  let draft;
+  try {
+    draft = await getScoutProvider().draftIntro({
+      locale,
+      requester: { name: user.name, headline: user.headline || user.role, orgName: user.orgName, voice: user.voice },
+      connector: { name: connector.name },
+      target: { name: target.name, headline: target.headline, orgName: target.orgName },
+      reason,
+      sharedTopics,
+    });
+  } catch (e) {
+    console.error("[intro draft]", e);
+    redirect(`${back}&error=${encodeURIComponent("AI draft failed — check provider settings.")}`);
+  }
+  // Replace an existing unsent draft for this target instead of piling up drafts.
+  await prisma.intro.deleteMany({ where: { requesterId: user.id, targetId: target.id, status: "draft" } });
+  const intro = await prisma.intro.create({
+    data: { requesterId: user.id, connectorId, targetId: target.id, reason, message: draft.message, provider: draft.provider, status: "draft" },
+  });
+  redirect(`/u/${target.handle}?intro=${intro.id}`);
+}
+
+async function transitionIntro(id: string, action: IntroAction, data: { message?: string; connectorNote?: string } = {}) {
+  const user = await requireUser();
+  const intro = await prisma.intro.findUniqueOrThrow({ where: { id } });
+  const res = applyIntroAction(intro, action, user.id);
+  if (!res.ok) throw new Error(res.error);
+  await prisma.intro.update({
+    where: { id },
+    data: {
+      status: res.status,
+      ...(data.message !== undefined ? { message: data.message.slice(0, 2000) } : {}),
+      ...(data.connectorNote !== undefined ? { connectorNote: data.connectorNote.slice(0, 1000) } : {}),
+      ...(action === "accept" || action === "decline" ? { respondedAt: new Date() } : {}),
+    },
+  });
+  revalidatePath("/", "layout");
+  return intro;
+}
+
+export async function sendIntroAction(fd: FormData) {
+  await transitionIntro(str(fd, "introId"), "send", { message: str(fd, "message") });
+  redirect("/intros?tab=sent");
+}
+
+export async function respondIntroAction(fd: FormData) {
+  const action = str(fd, "decision") === "accept" ? "accept" : "decline";
+  await transitionIntro(str(fd, "introId"), action, { connectorNote: str(fd, "note") });
+}
+
+export async function withdrawIntroAction(fd: FormData) {
+  await transitionIntro(str(fd, "introId"), "withdraw");
 }
 
 export async function addSignalAction(fd: FormData) {
@@ -345,11 +475,11 @@ export async function addSignalAction(fd: FormData) {
       orgs: { create: matches.map((o) => ({ orgId: o.id })) },
     },
   });
-  revalidatePath("/feed");
+  revalidatePath("/signals");
 }
 
 export async function ingestNowAction() {
   await requireUser();
   await ingestAllFeeds(prisma);
-  revalidatePath("/feed");
+  revalidatePath("/", "layout");
 }

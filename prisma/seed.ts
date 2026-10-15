@@ -4,6 +4,7 @@ import { toList } from "../src/lib/json";
 import { DEFAULT_FEEDS } from "../src/lib/rss";
 import { slugify } from "../src/lib/slug";
 import { SEED_ORGS } from "./seed-data";
+import { seedSocial } from "./seed-social";
 
 const prisma = new PrismaClient();
 const DAY = 86_400_000;
@@ -37,6 +38,7 @@ async function main() {
     create: {
       email: "demo@corridor.local",
       name: "Demo BD Lead",
+      isDemo: true,
       handle: "demo",
       role: "Business Development",
       orgName: "EmpowerTours",
@@ -76,16 +78,7 @@ async function main() {
       },
     });
   }
-  if ((await prisma.post.count({ where: { authorId: demo.id } })) === 0) {
-    const tag = async (slugs: string[]) =>
-      (await prisma.organization.findMany({ where: { slug: { in: slugs } }, select: { id: true } })).map((o) => ({ orgId: o.id }));
-    await prisma.post.create({
-      data: { authorId: demo.id, body: "This week: mapping peso stablecoin rails. Who's the right person at $bitso for MXNB settlement pilots?", orgs: { create: await tag(["bitso"]) } },
-    });
-    await prisma.post.create({
-      data: { authorId: demo.id, body: "Esta semana: preparando un memo bilingüe sobre SPEI + stablecoins. ¿Quién más está en $fintech-mexico?", orgs: { create: await tag(["fintech-mexico"]) } },
-    });
-  }
+  await seedSocial(prisma);
   console.log("Seeded demo user (demo@corridor.local) with a demo pipeline.");
 }
 

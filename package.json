@@ -15,10 +15,13 @@
     "ingest": "tsx scripts/ingest.ts",
     "setup": "prisma db push && tsx prisma/seed.ts",
     "postinstall": "prisma generate",
-    "screenshots": "tsx scripts/screenshots.ts"
+    "screenshots": "tsx scripts/screenshots.ts",
+    "logos": "tsx scripts/fetch-logos.ts"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
     "@prisma/client": "^6.19.3",
+    "lucide-react": "^1.57.0",
     "next": "15.5.28",
     "prisma": "^6.19.3",
     "react": "19.1.0",

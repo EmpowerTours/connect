@@ -2,7 +2,7 @@ import { AnthropicScoutProvider, OpenAIScoutProvider } from "./llm";
 import { MockScoutProvider } from "./mock";
 import type { ScoutProvider } from "./types";
 
-export type { ScoutInput, ScoutProvider, ScoutResult } from "./types";
+export type { IntroDraftInput, IntroDraftResult, ScoutInput, ScoutProvider, ScoutResult } from "./types";
 
 type Env = Record<string, string | undefined>;
 

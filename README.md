@@ -2,7 +2,7 @@
 
 **Farcaster meets LinkedIn for institutional blockchain BD.** A professional network for crypto foundations / L1s, financial institutions (banks, exchanges, custodians, asset managers, market infrastructure), fintechs and LatAm payment rails, consultancies and builders.
 
-Version one is useful with **zero other users**: a partner pipeline + organization directory + signals feed, with an AI scout that drafts outreach in your voice. The social layer (casts-style posts, follows) is there to grow into.
+The home screen is a **cast feed** (Farcaster-style: short posts, replies, recasts, quotes, channels). Profiles are **LinkedIn-style but proof-based** (track record from closed deals, intros made and helpful casts, not follower counts). **Warm intros** go through a mutual connection, with the ask drafted by the AI scout. A **private pipeline** ("My deals") is still there for the solo BD user.
 
 > Local-only MVP. No remote, no deploy, no external services required. "Corridor" is a placeholder name (payment corridors; works in EN/ES).
 
@@ -14,7 +14,8 @@ Next.js 15 (App Router, server actions) · TypeScript · Tailwind CSS v4 · Pris
 cd bdnet
 npm install            # also runs prisma generate
 cp .env.example .env   # only DATABASE_URL is needed
-npm run setup          # create SQLite DB + seed 53 orgs, RSS feeds, demo user/pipeline
+npm run setup          # create SQLite DB + seed 53 orgs, RSS feeds, demo user/pipeline, demo network
+npm run logos          # optional: fetch org favicons into public/logos (already committed)
 npm run ingest         # optional: pull public RSS news and tag it to orgs
 npm run dev            # http://localhost:3000 → "Continue as demo user"
 ```
@@ -23,35 +24,50 @@ Other scripts: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`,
 `SEED_DEMO=0 npm run db:seed` seeds only the directory and feeds (no demo user/pipeline).
 
 ## Features
-- **Auth (local stub):** magic-link flow with no email provider — the link is shown on the login page and logged to the server console. One-click demo login in dev (or `ALLOW_DEV_LOGIN=1` with `next start`). Sessions are DB-backed httpOnly cookies.
-- **Profiles:** name, handle, role, org, bio, writing voice (feeds the AI scout), language, verification badge placeholder (wallet/SIWE, Farcaster, LinkedIn are stubbed buttons).
-- **Organization directory:** 53 seeded real organizations, **public facts only** (name, type, HQ country, website, name aliases). Chains are filled only for a foundation's own network or where the research note cites a public source (Mercado Pago's Meli Dólar on Ethereum; Bitso's MXNB note). Everything else is left empty on purpose. Search, filter by type/region, add orgs, edit facts, follow orgs.
-- **Pipeline:** per-user workspace kanban — Awareness → Evaluation → Pilot → Committed (+ Lost). Drag-and-drop or arrow buttons; stage-gate rules (one step forward at a time, any step back, Lost from anywhere). Per deal: use case, next action + due date, **competing chains being evaluated**, contacts/champions, **advisors & influencers** (linked to consultancy orgs), activity log (stage changes logged automatically). Views: "Needs attention" (overdue / stale / no next action — *no warm prospect goes dark*) and "Who is evaluating competing chains".
-- **AI scout (pluggable):** `ScoutProvider` interface (`src/lib/scout`). Default offline **mock** provider produces a fit summary, angles and an outreach draft (EN/ES, adapts to your "voice": short/formal) using only facts on file. Set `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` (optionally `SCOUT_PROVIDER`, `OPENAI_MODEL`, `ANTHROPIC_MODEL`) to use a real model; prompts forbid inventing facts. Drafts are saved per org; nothing is ever sent.
-- **Signals feed:** RSS ingestion from public crypto/fintech feeds (CoinDesk, The Block, Decrypt, Ledger Insights, Finextra, CriptoNoticias) + manual signals; auto-tagged to orgs by case-sensitive whole-word name/alias match. Org pages show their signals.
-- **Social feed:** 320-char casts, tag orgs with `$slug` (or just mention them by name), follow people and orgs, "Following only" filter, public user pages.
-- **Bilingual:** every UI string in `src/lib/i18n.ts` (EN/ES, parity tested); toggle in the header.
-- **Dark, mobile-friendly UI:** bottom tab bar on mobile, swipeable kanban columns.
+**Navigation:** Home (feed) · Channels · Intros · My deals (private pipeline) · Profile. Desktop is three columns (nav / feed / right rail with trending channels, suggested people, signals); mobile has bottom tabs and a floating cast button. Organization pages are reached from `$tags`, search, the right rail and `/orgs`.
+
+- **Casts:** 320 characters (code points), post-type chips (Looking for partner, Launch, Hiring, Insight), tag orgs with `$slug` (plain name mentions also tag), mention people with `@handle`, link `/channel`. Reply threads (nested, with connector lines), recast and quote-cast, likes (optimistic). Following / For you tabs.
+- **Channels:** join/leave, channel feeds, trending ranking (recent-activity decay + membership).
+- **Profiles:** cover, avatar, headline @ org, location, proof badges (work email, LinkedIn, wallet; all **unverified placeholders**), track record (deals closed, intros made, helpful casts → reputation tier), mutual connections, Follow / Request intro, Casts / Replies / About tabs.
+- **Org pages:** logo header with an "Unverified org" pill (no org verification yet), Follow, **Add to my deals**, tabs for casts mentioning the org, people at the org, news signals, public facts, and your private deal panel.
+- **Warm intros:** "Request intro" on a profile → pick a mutual connection → give a reason → the scout drafts the ask (editable) → send. The connector accepts (with a forwarded note) or declines; the requester can withdraw. `/intros` has Inbox / Sent / Made tabs with statuses; accepted intros count toward the connector's reputation.
+- **My deals (private):** the kanban pipeline from v1 (stage gates, due dates, competing chains, contacts, advisors, activity log, AI scout drafts). Only the count of committed deals shows publicly in the track record.
+- **Organization directory:** 53 real organizations with **public facts only** (name, type, HQ country, website, aliases); unknown fields left empty.
+- **Signals:** RSS ingestion from public feeds (CoinDesk, The Block, Decrypt, Ledger Insights, Finextra, CriptoNoticias) + manual signals, auto-tagged to orgs.
+- **Auth (local stub):** magic link shown on screen; one-click demo login in dev (or `ALLOW_DEV_LOGIN=1` with `next start`).
+- **Bilingual:** EN/ES for every UI string (parity tested).
+- **Design:** high-contrast dark theme, one violet accent, Inter (self-hosted), initials avatars, favicon logos with initials fallback, empty states, a shimmer skeleton while AI drafts, small motion on likes/menus.
+
+### Demo content (clearly labelled)
+The seed adds 8 **fictional** people at fictional companies (Quetzal Rails, Banco Meridiano, Harbor Asset Management, …), their casts, channels and intros. Every demo account carries a **Demo** badge and a profile note. No real people are impersonated; real organizations only appear as `$tags` in questions and opinions, and real org pages show no people until someone verifies.
 
 ## What's mocked / not done
-- No real email delivery (magic link shown on screen). No real verification (badges are placeholders).
+- No real email delivery (magic link shown on screen). No real verification: work email, LinkedIn, wallet and org verification are placeholders shown as "unverified".
+- Intros never leave the app (no email/DM). The connector side is exercised with demo data; you can only log in as the demo user locally.
 - AI scout uses a deterministic template provider unless an API key is set; real providers are wired but untested against live APIs here.
 - No contact enrichment, job-post / RWA.xyz / onchain data sources yet. RSS tagging is name matching, not entity resolution.
-- Single-user workspaces (no team sharing / roles yet). No notifications.
+- Single-user workspaces (no team sharing / roles yet). No notifications beyond the Intros badge. No DMs.
+- No route-level `loading.tsx`: in this Next 15.5 build, streamed Suspense boundaries stopped server-action refreshes from showing, so pages render in one pass.
 
 ## Project layout
 ```
 prisma/schema.prisma      data model (SQLite)
 prisma/seed-data.ts       53 public-fact orgs
 prisma/seed.ts            seed script (+ demo pipeline)
+prisma/seed-social.ts     fictional demo network: users, channels, casts, intros
+scripts/fetch-logos.ts    favicon fetcher → public/logos
 scripts/ingest.ts         RSS ingestion CLI
 scripts/screenshots.ts    headless screenshots
 src/lib/pipeline.ts       stage rules, grouping, attention, competing-chain map
 src/lib/tagging.ts        org mention matching, $slug tags
 src/lib/rss.ts, ingest.ts RSS parse + store
-src/lib/scout/            AI scout interface, mock, OpenAI/Anthropic providers
+src/lib/posts.ts          cast validation, mentions, tokenizer, threading, trending
+src/lib/intros.ts         intro state machine, mutual connections, reputation
+src/lib/feed.ts           feed queries (home, channel, user, org)
+src/lib/scout/            AI scout interface (fit + intro drafts), mock, OpenAI/Anthropic
 src/lib/i18n.ts           EN/ES strings
 src/app/actions.ts        server actions
-src/app/(app)/…           pipeline, directory, orgs/[slug], feed, profile, u/[handle]
+src/app/(app)/…           home feed, post/[id], channels, intros, u/[handle], orgs, pipeline, signals, search
+src/components/           shell/nav, composer, post card + actions, intro modal, deal panel
 tests/                    vitest unit tests
 ```

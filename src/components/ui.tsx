@@ -3,28 +3,16 @@ import type { ReactNode } from "react";
 import { ORG_TYPE_LABELS, t, type Locale } from "@/lib/i18n";
 import type { DueStatus, Stage } from "@/lib/pipeline";
 
-const TYPE_COLORS: Record<string, string> = {
-  foundation: "border-violet-500/40 text-violet-300",
-  bank: "border-sky-500/40 text-sky-300",
-  exchange: "border-amber-500/40 text-amber-300",
-  custodian: "border-teal-500/40 text-teal-300",
-  asset_manager: "border-emerald-500/40 text-emerald-300",
-  market_infra: "border-rose-500/40 text-rose-300",
-  fintech: "border-fuchsia-500/40 text-fuchsia-300",
-  advisor: "border-orange-500/40 text-orange-300",
-  builder: "border-zinc-500/40 text-zinc-300",
-};
-
 export function OrgTypeBadge({ type, locale }: { type: string; locale: Locale }) {
-  return <span className={`chip ${TYPE_COLORS[type] ?? ""}`}>{ORG_TYPE_LABELS[locale][type] ?? type}</span>;
+  return <span className="chip">{ORG_TYPE_LABELS[locale][type] ?? type}</span>;
 }
 
 export const STAGE_COLORS: Record<Stage, string> = {
-  awareness: "bg-zinc-400",
-  evaluation: "bg-sky-400",
+  awareness: "bg-faint",
+  evaluation: "bg-accent",
   pilot: "bg-amber-400",
-  committed: "bg-emerald-400",
-  lost: "bg-rose-500",
+  committed: "bg-success",
+  lost: "bg-danger",
 };
 
 export function StageDot({ stage }: { stage: Stage }) {
@@ -34,9 +22,9 @@ export function StageDot({ stage }: { stage: Stage }) {
 const DUE_COLORS: Record<DueStatus, string> = {
   overdue: "border-rose-500/50 text-rose-300 bg-rose-500/10",
   today: "border-amber-500/50 text-amber-300 bg-amber-500/10",
-  soon: "border-sky-500/40 text-sky-300",
-  later: "border-line text-zinc-400",
-  none: "border-line text-zinc-500",
+  soon: "border-accent/40 text-violet-200",
+  later: "border-line text-muted",
+  none: "border-line text-faint",
 };
 
 export function DueChip({ status, date, locale }: { status: DueStatus; date: Date | null; locale: Locale }) {
@@ -65,9 +53,9 @@ export function Avatar({ name, size = 36 }: { name: string; size?: number }) {
 
 export function VerifiedBadge({ verified, locale }: { verified: boolean; locale: Locale }) {
   return verified ? (
-    <span title={t(locale, "profile.verified")} className="text-sky-400">✓</span>
+    <span title={t(locale, "profile.verified")} className="text-accent">✓</span>
   ) : (
-    <span title={t(locale, "profile.verifyHint")} className="chip border-dashed text-zinc-500">
+    <span title={t(locale, "profile.verifyHint")} className="chip border-dashed text-faint">
       {t(locale, "profile.unverified")}
     </span>
   );
@@ -83,9 +71,9 @@ export function OrgChip({ slug, name }: { slug: string; name: string }) {
 
 export function Section({ title, children, right }: { title: string; children: ReactNode; right?: ReactNode }) {
   return (
-    <section className="card p-4">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-zinc-200">{title}</h2>
+    <section className="card p-4 sm:p-5">
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <h2 className="text-[15px] font-bold tracking-tight">{title}</h2>
         {right}
       </div>
       {children}
