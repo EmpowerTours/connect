@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { Building2, Check, ExternalLink, Inbox, ShieldCheck, X } from "lucide-react";
+import { Building2, Check, EyeOff, ExternalLink, Flag, Inbox, ShieldCheck, X } from "lucide-react";
 import { adminDecideClaimAction, adminDecideOrgRequestAction } from "@/app/claim-actions";
+import { adminDecideReportAction, adminSetOpportunityHiddenAction } from "@/app/moderation-actions";
 import { UserAvatar } from "@/components/avatar";
 import { EmptyState } from "@/components/empty-state";
 import { TabPage } from "@/components/layout";
@@ -11,28 +12,35 @@ import { getLocale, requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ORG_TYPE_LABELS, t, type Locale } from "@/lib/i18n";
 import { linkLabel } from "@/lib/links";
+import { isReportReason } from "@/lib/opportunities";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin" };
 
-type Tab = "claims" | "orgs";
+type Tab = "claims" | "orgs" | "reports";
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   await requireAdmin();
   const locale = await getLocale();
   const raw = (await searchParams).tab;
-  const tab: Tab = raw === "orgs" ? "orgs" : "claims";
+  const tab: Tab = raw === "orgs" || raw === "reports" ? raw : "claims";
   const userSel = { id: true, name: true, handle: true, headline: true, walletVerified: true, walletAddress: true } as const;
   const [claims, requests, counts] = await Promise.all([
     tab === "claims"
       ? prisma.orgClaim.findMany({ where: { status: "pending" }, include: { user: { select: userSel }, org: { select: { name: true, slug: true, website: true } } }, orderBy: { createdAt: "asc" } })
       : Promise.resolve([]),
     tab === "orgs" ? prisma.orgRequest.findMany({ where: { status: "pending" }, include: { user: { select: userSel } }, orderBy: { createdAt: "asc" } }) : Promise.resolve([]),
-    Promise.all([prisma.orgClaim.count({ where: { status: "pending" } }), prisma.orgRequest.count({ where: { status: "pending" } })]),
+    Promise.all([
+      prisma.orgClaim.count({ where: { status: "pending" } }),
+      prisma.orgRequest.count({ where: { status: "pending" } }),
+      prisma.report.groupBy({ by: ["targetType", "targetId"], where: { status: "open" } }).then((g) => g.length),
+    ]),
   ]);
+  const reported = tab === "reports" ? await loadReports() : { groups: [], hidden: [] };
   const tabs: { key: Tab; label: string; n: number }[] = [
     { key: "claims", label: t(locale, "admin.claims"), n: counts[0] },
     { key: "orgs", label: t(locale, "admin.orgRequests"), n: counts[1] },
+    { key: "reports", label: t(locale, "admin.reports"), n: counts[2] },
   ];
 
   return (
@@ -106,9 +114,86 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             ))}
           </ul>
         ))}
+      {tab === "reports" && (
+        <>
+          {reported.groups.length === 0 ? (
+            <EmptyState icon={Flag} title={t(locale, "admin.noReports")} body={t(locale, "admin.noReportsBody")} />
+          ) : (
+            <ul className="mt-4 space-y-3">
+              {reported.groups.map(({ opp, reports }) => (
+                <li key={opp.id} className="glass p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-accent-ink">{t(locale, opp.kind === "offer" ? "opps.offer" : "opps.ask")}</p>
+                  <Link href={`/opportunities/${opp.id}`} className="mt-0.5 block text-[15.5px] font-semibold leading-snug hover:underline">{opp.headline}</Link>
+                  <p className="mt-0.5 text-[13px] text-faint">
+                    {t(locale, "admin.postBy")} <Link href={`/u/${opp.author.handle}`} className="text-accent-ink hover:underline">{opp.author.name}</Link> · {timeAgo(opp.createdAt, locale)}
+                  </p>
+                  {opp.body && <p className="mt-2 line-clamp-3 text-[13.5px] text-muted">{opp.body}</p>}
+                  <ul className="mt-3 space-y-1.5 rounded-2xl bg-raised/70 p-3 text-[13px]">
+                    {reports.map((r) => (
+                      <li key={r.id}>
+                        <span className="font-semibold">{isReportReason(r.reason) ? t(locale, `report.${r.reason}`) : r.reason}</span>
+                        <span className="text-faint"> · {t(locale, "admin.reportedBy")} @{r.reporter.handle} · {timeAgo(r.createdAt, locale)}</span>
+                        {r.note && <span className="block text-fg/85">{r.note}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <form action={adminDecideReportAction}>
+                      <input type="hidden" name="reportId" value={reports[0].id} />
+                      <input type="hidden" name="decision" value="dismiss" />
+                      <SubmitButton className="btn-secondary h-10 w-full text-[13px]"><X size={15} /> {t(locale, "admin.dismiss")}</SubmitButton>
+                    </form>
+                    <form action={adminDecideReportAction}>
+                      <input type="hidden" name="reportId" value={reports[0].id} />
+                      <input type="hidden" name="decision" value="hide" />
+                      <SubmitButton className="btn-primary h-10 w-full text-[13px]"><EyeOff size={15} /> {t(locale, "admin.hide")}</SubmitButton>
+                    </form>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          {reported.hidden.length > 0 && (
+            <section className="mt-6">
+              <h2 className="eyebrow mb-2">{t(locale, "admin.hidden")}</h2>
+              <ul className="space-y-2">
+                {reported.hidden.map((o) => (
+                  <li key={o.id} className="card flex items-center justify-between gap-3 px-4 py-3">
+                    <Link href={`/opportunities/${o.id}`} className="min-w-0 truncate text-[14px] font-medium hover:underline">{o.headline}</Link>
+                    <form action={adminSetOpportunityHiddenAction}>
+                      <input type="hidden" name="id" value={o.id} />
+                      <input type="hidden" name="hidden" value="0" />
+                      <SubmitButton className="btn-ghost h-8 shrink-0 text-[12.5px]">{t(locale, "admin.unhide")}</SubmitButton>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </>
+      )}
       <p className="mt-8 px-1 text-center text-[11.5px] text-faint">{t(locale, "admin.footer")}</p>
     </TabPage>
   );
+}
+
+async function loadReports() {
+  const open = await prisma.report.findMany({
+    where: { status: "open", targetType: "opportunity" },
+    include: { reporter: { select: { handle: true } } },
+    orderBy: { createdAt: "asc" },
+  });
+  const ids = [...new Set(open.map((r) => r.targetId))];
+  const [opps, hidden] = await Promise.all([
+    prisma.opportunity.findMany({ where: { id: { in: ids } }, include: { author: { select: { name: true, handle: true } } } }),
+    prisma.opportunity.findMany({ where: { hidden: true }, select: { id: true, headline: true }, orderBy: { updatedAt: "desc" }, take: 20 }),
+  ]);
+  const byId = new Map(opps.map((o) => [o.id, o]));
+  const groups = ids.flatMap((id) => {
+    const opp = byId.get(id);
+    return opp ? [{ opp, reports: open.filter((r) => r.targetId === id) }] : [];
+  });
+  return { groups, hidden };
 }
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {

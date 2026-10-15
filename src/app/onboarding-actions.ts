@@ -112,7 +112,7 @@ export async function firstOpportunityAction(fd: FormData) {
   const now = new Date();
   if (!user.onboardedAt) await prisma.user.update({ where: { id: user.id }, data: { onboardedAt: now } });
   if (fd.get("skip") === "1") redirect("/?welcome=1");
-  const r = validateOpportunity({ kind: str(fd, "kind"), headline: str(fd, "headline"), body: str(fd, "body"), region: user.region });
+  const r = validateOpportunity({ kind: str(fd, "kind"), headline: str(fd, "headline"), body: str(fd, "body"), region: user.region, topic: str(fd, "topic") });
   if (!r.ok) redirect(step("first", r.error));
   await prisma.opportunity.create({ data: { ...r.value, orgName: user.orgName, orgId: user.orgId, authorId: user.id } });
   revalidatePath("/opportunities");

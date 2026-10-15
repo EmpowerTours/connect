@@ -13,7 +13,7 @@ import { prisma } from "@/lib/db";
 import { ORG_TYPE_LABELS, REGION_LABELS, t, type Locale } from "@/lib/i18n";
 import { parseList } from "@/lib/json";
 import { avatarUrl } from "@/lib/media";
-import { FOCUS_TAGS, MAX_FOCUS_TAGS, ONBOARDING_STEPS, isOnboardingError, type OnboardingStep } from "@/lib/onboarding";
+import { FOCUS_TAGS, MAX_FOCUS_TAGS, ONBOARDING_STEPS, isFocusTag, isOnboardingError, type OnboardingStep } from "@/lib/onboarding";
 import { OPP_BODY_MAX, OPP_HEADLINE_MAX } from "@/lib/opportunities";
 
 export const dynamic = "force-dynamic";
@@ -196,7 +196,7 @@ function StepProfile({ user, locale }: { user: U; locale: Locale }) {
 }
 
 function StepFirst({ user, locale }: { user: U; locale: Locale }) {
-  const topic = parseList(user.focusTags)[0];
+  const topics = parseList(user.focusTags).filter(isFocusTag);
   return (
     <form action={firstOpportunityAction} className="space-y-4">
       <fieldset>
@@ -218,10 +218,21 @@ function StepFirst({ user, locale }: { user: U; locale: Locale }) {
         <span className="label">{t(locale, "opps.body")}</span>
         <textarea name="body" rows={3} maxLength={OPP_BODY_MAX} className="input" placeholder={t(locale, "opps.bodyPh")} />
       </label>
-      {topic && (
-        <p className="flex items-center gap-1.5 rounded-xl bg-accent-soft/60 px-3 py-2 text-[12.5px] text-accent-ink">
-          <Sparkles size={13} /> {t(locale, "onb.firstHint").replace("{topic}", t(locale, `focus.${topic as (typeof FOCUS_TAGS)[number]}`))}
-        </p>
+      {topics.length > 0 && (
+        <fieldset>
+          <legend className="label">{t(locale, "opps.topic")}</legend>
+          <div className="flex flex-wrap gap-2">
+            {topics.map((tag, i) => (
+              <label key={tag} className="cursor-pointer select-none rounded-full border border-line bg-white/80 px-3 py-1.5 text-[12.5px] font-medium text-muted transition has-[:checked]:border-accent has-[:checked]:bg-accent has-[:checked]:text-white">
+                <input type="radio" name="topic" value={tag} defaultChecked={i === 0} className="sr-only" />
+                {t(locale, `focus.${tag}`)}
+              </label>
+            ))}
+          </div>
+          <p className="mt-2 flex items-center gap-1.5 text-[12.5px] text-accent-ink">
+            <Sparkles size={13} /> {t(locale, "onb.firstHint").replace("{topic}", t(locale, `focus.${topics[0]}`))}
+          </p>
+        </fieldset>
       )}
       <SubmitButton className={cta}>{t(locale, "onb.post")}</SubmitButton>
       <button name="skip" value="1" formNoValidate className="btn-ghost h-11 w-full text-[14px]">{t(locale, "onb.skip")}</button>

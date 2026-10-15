@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { DemoBadge } from "@/components/badges";
 import { REGION_LABELS, t, type Locale } from "@/lib/i18n";
+import { isFocusTag } from "@/lib/onboarding";
 import { orgInitial } from "@/lib/opportunities";
 
 export interface OpportunityView {
@@ -11,6 +12,9 @@ export interface OpportunityView {
   body: string;
   region: string;
   orgName: string;
+  topic: string;
+  /** Only set in "Your posts": live | expired | filled | closed | hidden */
+  state?: "live" | "expired" | "filled" | "closed" | "hidden";
   author: { name: string; handle: string; isDemo: boolean };
   /** "self" | "connected" | "intro" (with via) | "none" */
   path: { kind: "self" | "connected" | "intro" | "none"; viaName?: string; viaHandle?: string };
@@ -18,17 +22,16 @@ export interface OpportunityView {
 
 export function OpportunityCard({ o, locale, index }: { o: OpportunityView; locale: Locale; index: number }) {
   const ask = o.kind === "ask";
+  const detail = `/opportunities/${o.id}`;
   const action =
-    o.path.kind === "intro"
-      ? { href: `/u/${o.author.handle}?intro=1${o.path.viaHandle ? `&via=${o.path.viaHandle}` : ""}`, label: t(locale, "opps.requestIntro") }
-      : o.path.kind === "none"
-        ? { href: `/u/${o.author.handle}?intro=1`, label: t(locale, "opps.requestIntro") }
-        : { href: `/u/${o.author.handle}`, label: t(locale, "opps.viewProfile") };
+    o.path.kind === "intro" || o.path.kind === "none"
+      ? { href: `${detail}#intro`, label: t(locale, "opps.requestIntro") }
+      : { href: `/u/${o.author.handle}`, label: t(locale, "opps.viewProfile") };
   const note =
     o.path.kind === "intro" ? t(locale, "opps.via").replace("{name}", o.path.viaName ?? "")
     : o.path.kind === "connected" ? t(locale, "opps.connected")
     : o.path.kind === "self" ? t(locale, "opps.yours")
-    : t(locale, "opps.noPath");
+    : t(locale, "opps.direct");
   return (
     <article
       className="relative snap-start rounded-[26px] border border-white/90 p-5 pb-5 shadow-[0_1px_2px_rgb(23_21_31/0.04),0_-6px_24px_-14px_rgb(76_29_149/0.22)] backdrop-blur-xl animate-rise"
@@ -52,16 +55,31 @@ export function OpportunityCard({ o, locale, index }: { o: OpportunityView; loca
             <span className={ask ? "text-accent-ink" : "text-faint"}>{t(locale, ask ? "opps.ask" : "opps.offer")}</span>
             {o.author.isDemo && <DemoBadge locale={locale} />}
           </div>
-          <h3 className="mt-1 text-[16.5px] font-semibold leading-snug tracking-[-0.005em] text-fg">{o.headline}</h3>
-          {o.region && (
-            <span className="mt-2 inline-flex rounded-full border border-line bg-white/80 px-2.5 py-0.5 text-[12px] font-medium text-muted">
-              {REGION_LABELS[locale][o.region] ?? o.region}
-            </span>
+          <h3 className="mt-1 text-[16.5px] font-semibold leading-snug tracking-[-0.005em] text-fg">
+            <Link href={detail} className="hover:underline">{o.headline}</Link>
+          </h3>
+          {(o.topic || o.region || (o.state && o.state !== "live")) && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {o.state && o.state !== "live" && (
+                <span className="inline-flex rounded-full bg-zinc-900/80 px-2.5 py-0.5 text-[12px] font-medium text-white">{t(locale, `opps.state.${o.state}`)}</span>
+              )}
+              {o.topic && isFocusTag(o.topic) && (
+                <span className="inline-flex rounded-full bg-accent-soft px-2.5 py-0.5 text-[12px] font-medium text-accent-ink">{t(locale, `focus.${o.topic}`)}</span>
+              )}
+              {o.region && (
+                <span className="inline-flex rounded-full border border-line bg-white/80 px-2.5 py-0.5 text-[12px] font-medium text-muted">
+                  {REGION_LABELS[locale][o.region] ?? o.region}
+                </span>
+              )}
+            </div>
           )}
           {o.body && <p className="mt-2.5 text-[14px] leading-relaxed text-muted">{o.body}</p>}
           <div className="mt-4 flex items-center justify-between gap-3">
             {o.path.kind === "self" ? (
-              <span className="text-[13px] font-medium text-faint">{note}</span>
+              <>
+                <Link href={detail} className="btn-pill">{t(locale, "opps.manage")} <ArrowRight size={15} /></Link>
+                <span className="text-[12.5px] font-medium text-faint">{note}</span>
+              </>
             ) : (
               <>
                 <Link href={action.href} className="btn-pill">

@@ -13,68 +13,69 @@ datasource db {
 }
 
 model User {
-  id                 String   @id @default(cuid())
+  id                  String        @id @default(cuid())
   /// Optional: Mera passkey accounts are identified by wallet, not email.
-  email              String?  @unique
-  name               String
-  handle             String   @unique
-  role               String   @default("")
-  orgName            String   @default("")
-  orgId              String?
-  org                Organization? @relation("Members", fields: [orgId], references: [id])
-  bio                String   @default("")
+  email               String?       @unique
+  name                String
+  handle              String        @unique
+  role                String        @default("")
+  orgName             String        @default("")
+  orgId               String?
+  org                 Organization? @relation("Members", fields: [orgId], references: [id])
+  bio                 String        @default("")
   /// Free-text description of how the user writes; fed to the AI scout.
-  voice              String   @default("")
-  locale             String   @default("en")
+  voice               String        @default("")
+  locale              String        @default("en")
   /// Placeholder for future wallet / Farcaster / LinkedIn verification.
-  verified           Boolean  @default(false)
-  verificationMethod String?
+  verified            Boolean       @default(false)
+  verificationMethod  String?
   /// Clearly-labelled fictional seed account.
-  isDemo             Boolean  @default(false)
-  headline           String   @default("")
-  location           String   @default("")
+  isDemo              Boolean       @default(false)
+  headline            String        @default("")
+  location            String        @default("")
   /// Proof placeholders — all false until real verification ships.
-  workEmailVerified  Boolean  @default(false)
-  linkedinVerified   Boolean  @default(false)
+  workEmailVerified   Boolean       @default(false)
+  linkedinVerified    Boolean       @default(false)
   /// Lowercased EVM address of the user's Mera passkey wallet (Monad).
   /// Only ever written after a server-verified EIP-712 signature.
-  walletAddress      String?  @unique
-  walletVerified     Boolean  @default(false)
-  walletVerifiedAt   DateTime?
+  walletAddress       String?       @unique
+  walletVerified      Boolean       @default(false)
+  walletVerifiedAt    DateTime?
   /// WebAuthn credential id of the Mera passkey (base64url). Informational.
   passkeyCredentialId String?
   /// Set when the onboarding flow is finished (real users only).
-  onboardedAt        DateTime?
-  region             String   @default("")
+  onboardedAt         DateTime?
+  region              String        @default("")
   /// JSON list of FOCUS_TAGS (src/lib/onboarding.ts).
-  focusTags          String   @default("[]")
+  focusTags           String        @default("[]")
   /// Storage key of the profile photo (see src/lib/storage.ts), e.g. avatars/<id>.webp
-  avatarKey          String?
-  linkX              String   @default("")
-  linkLinkedin       String   @default("")
-  linkWebsite        String   @default("")
-  createdAt          DateTime @default(now())
+  avatarKey           String?
+  linkX               String        @default("")
+  linkLinkedin        String        @default("")
+  linkWebsite         String        @default("")
+  createdAt           DateTime      @default(now())
 
   likes            Like[]
   recasts          Recast[]
   mentionedIn      PostMention[]
   channels         ChannelMember[]
-  introsRequested  Intro[] @relation("IntroRequester")
-  introsConnecting Intro[] @relation("IntroConnector")
-  introsTargeted   Intro[] @relation("IntroTarget")
+  introsRequested  Intro[]         @relation("IntroRequester")
+  introsConnecting Intro[]         @relation("IntroConnector")
+  introsTargeted   Intro[]         @relation("IntroTarget")
 
-  sessions     Session[]
-  workspaces   Workspace[]
-  posts        Post[]
-  activities   Activity[]
-  drafts       ScoutDraft[]
-  signals      Signal[]
-  followsOrgs  FollowOrg[]
-  following    FollowUser[] @relation("Follower")
-  followers    FollowUser[] @relation("Followee")
-  opportunities      Opportunity[]
-  orgClaims          OrgClaim[]
-  orgRequests        OrgRequest[]
+  sessions      Session[]
+  workspaces    Workspace[]
+  posts         Post[]
+  activities    Activity[]
+  drafts        ScoutDraft[]
+  signals       Signal[]
+  followsOrgs   FollowOrg[]
+  following     FollowUser[]  @relation("Follower")
+  followers     FollowUser[]  @relation("Followee")
+  opportunities Opportunity[]
+  orgClaims     OrgClaim[]
+  orgRequests   OrgRequest[]
+  reports       Report[]
 }
 
 /// A user's claim to work at an organization. Pending until an admin
@@ -104,20 +105,20 @@ model OrgClaim {
 
 /// A user's request to add an organization that is not in the directory yet.
 model OrgRequest {
-  id           String    @id @default(cuid())
-  userId       String
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name         String
-  website      String    @default("")
-  type         String    @default("")
-  note         String    @default("")
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  website   String    @default("")
+  type      String    @default("")
+  note      String    @default("")
   /// pending | approved | rejected
-  status       String    @default("pending")
+  status    String    @default("pending")
   /// The organization created on approval.
-  orgId        String?
-  decidedAt    DateTime?
-  decidedBy    String?
-  createdAt    DateTime  @default(now())
+  orgId     String?
+  decidedAt DateTime?
+  decidedBy String?
+  createdAt DateTime  @default(now())
 
   @@index([status, createdAt])
 }
@@ -158,13 +159,13 @@ model Organization {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  members   User[]       @relation("Members")
-  deals     Deal[]
-  signals   SignalOrg[]
-  posts     PostOrg[]
-  followers FollowOrg[]
-  drafts    ScoutDraft[]
-  advisingOn Advisor[]
+  members       User[]        @relation("Members")
+  deals         Deal[]
+  signals       SignalOrg[]
+  posts         PostOrg[]
+  followers     FollowOrg[]
+  drafts        ScoutDraft[]
+  advisingOn    Advisor[]
   opportunities Opportunity[]
   claims        OrgClaim[]
 }
@@ -179,20 +180,20 @@ model Workspace {
 }
 
 model Deal {
-  id              String    @id @default(cuid())
+  id              String       @id @default(cuid())
   workspaceId     String
-  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace       Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   orgId           String
   org             Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  stage           String    @default("awareness")
-  useCase         String    @default("")
-  nextAction      String    @default("")
+  stage           String       @default("awareness")
+  useCase         String       @default("")
+  nextAction      String       @default("")
   nextActionDue   DateTime?
   /// JSON string[] — chains this institution is evaluating in competition
-  competingChains String    @default("[]")
-  lostReason      String    @default("")
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  competingChains String       @default("[]")
+  lostReason      String       @default("")
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
   contacts   Contact[]
   advisors   Advisor[]
@@ -214,17 +215,17 @@ model Contact {
 }
 
 model Advisor {
-  id           String   @id @default(cuid())
+  id           String        @id @default(cuid())
   dealId       String
-  deal         Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  deal         Deal          @relation(fields: [dealId], references: [id], onDelete: Cascade)
   name         String
-  firm         String   @default("")
+  firm         String        @default("")
   /// Optional link to an advisor org in the directory (consultancy, law firm…)
   advisorOrgId String?
   advisorOrg   Organization? @relation(fields: [advisorOrgId], references: [id])
-  influence    String   @default("medium")
-  notes        String   @default("")
-  createdAt    DateTime @default(now())
+  influence    String        @default("medium")
+  notes        String        @default("")
+  createdAt    DateTime      @default(now())
 }
 
 model Activity {
@@ -239,19 +240,19 @@ model Activity {
 }
 
 model ScoutDraft {
-  id        String   @id @default(cuid())
+  id        String       @id @default(cuid())
   orgId     String
   org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   provider  String
-  locale    String   @default("en")
+  locale    String       @default("en")
   fit       String
   /// JSON string[]
-  angles    String   @default("[]")
+  angles    String       @default("[]")
   subject   String
   draft     String
-  createdAt DateTime @default(now())
+  createdAt DateTime     @default(now())
 }
 
 model RssFeed {
@@ -264,16 +265,16 @@ model RssFeed {
 }
 
 model Signal {
-  id          String   @id @default(cuid())
-  source      String   @default("manual")
-  sourceName  String   @default("")
+  id          String      @id @default(cuid())
+  source      String      @default("manual")
+  sourceName  String      @default("")
   title       String
-  url         String?  @unique
-  summary     String   @default("")
-  publishedAt DateTime @default(now())
+  url         String?     @unique
+  summary     String      @default("")
+  publishedAt DateTime    @default(now())
   createdById String?
-  createdBy   User?    @relation(fields: [createdById], references: [id])
-  createdAt   DateTime @default(now())
+  createdBy   User?       @relation(fields: [createdById], references: [id])
+  createdAt   DateTime    @default(now())
   orgs        SignalOrg[]
 }
 
@@ -287,22 +288,22 @@ model SignalOrg {
 }
 
 model Post {
-  id        String   @id @default(cuid())
+  id        String        @id @default(cuid())
   authorId  String
-  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  author    User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
   body      String
   /// "", looking_for_partner, launch, hiring, insight
-  kind      String   @default("")
+  kind      String        @default("")
   parentId  String?
-  parent    Post?    @relation("Replies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies   Post[]   @relation("Replies")
+  parent    Post?         @relation("Replies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Post[]        @relation("Replies")
   rootId    String?
   quoteOfId String?
-  quoteOf   Post?    @relation("Quotes", fields: [quoteOfId], references: [id], onDelete: SetNull)
-  quotes    Post[]   @relation("Quotes")
+  quoteOf   Post?         @relation("Quotes", fields: [quoteOfId], references: [id], onDelete: SetNull)
+  quotes    Post[]        @relation("Quotes")
   channelId String?
-  channel   Channel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
-  createdAt DateTime @default(now())
+  channel   Channel?      @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  createdAt DateTime      @default(now())
   orgs      PostOrg[]
   mentions  PostMention[]
   likes     Like[]
@@ -342,11 +343,11 @@ model Recast {
 }
 
 model Channel {
-  id          String   @id @default(cuid())
-  slug        String   @unique
+  id          String          @id @default(cuid())
+  slug        String          @unique
   name        String
-  description String   @default("")
-  createdAt   DateTime @default(now())
+  description String          @default("")
+  createdAt   DateTime        @default(now())
   members     ChannelMember[]
   posts       Post[]
 }
@@ -365,7 +366,7 @@ model ChannelMember {
 /// An ask or offer posted on behalf of an organization ("Opportunities" tab).
 model Opportunity {
   id        String        @id @default(cuid())
-  kind      String        // ask | offer
+  kind      String // ask | offer
   headline  String
   body      String        @default("")
   region    String        @default("")
@@ -374,29 +375,66 @@ model Opportunity {
   org       Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
   authorId  String
   author    User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  /// One of FOCUS_TAGS (src/lib/onboarding.ts) or "" for none
+  topic     String        @default("")
+  /// open | filled | closed
+  status    String        @default("open")
+  /// Hidden from everyone but the author after an admin moderation decision
+  hidden    Boolean       @default(false)
+  expiresAt DateTime?
+  closedAt  DateTime?
   createdAt DateTime      @default(now())
+  updatedAt DateTime      @default(now()) @updatedAt
+  intros    Intro[]
 
   @@index([createdAt])
+  @@index([status, hidden, expiresAt])
+}
+
+/// A member's report about content (today: opportunities). Admins hide or dismiss.
+model Report {
+  id         String    @id @default(cuid())
+  reporterId String
+  reporter   User      @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  /// "opportunity"
+  targetType String
+  targetId   String
+  /// spam | misleading | impersonation | offensive | other
+  reason     String
+  note       String    @default("")
+  /// open | actioned | dismissed
+  status     String    @default("open")
+  decidedAt  DateTime?
+  decidedBy  String?
+  createdAt  DateTime  @default(now())
+
+  @@unique([reporterId, targetType, targetId])
+  @@index([status, createdAt])
+  @@index([targetType, targetId])
 }
 
 model Intro {
-  id            String    @id @default(cuid())
+  id            String       @id @default(cuid())
   requesterId   String
-  requester     User      @relation("IntroRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  requester     User         @relation("IntroRequester", fields: [requesterId], references: [id], onDelete: Cascade)
   connectorId   String
-  connector     User      @relation("IntroConnector", fields: [connectorId], references: [id], onDelete: Cascade)
+  connector     User         @relation("IntroConnector", fields: [connectorId], references: [id], onDelete: Cascade)
   targetId      String
-  target        User      @relation("IntroTarget", fields: [targetId], references: [id], onDelete: Cascade)
-  reason        String    @default("")
+  target        User         @relation("IntroTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  reason        String       @default("")
   /// The ask to the connector (AI-drafted, editable)
-  message       String    @default("")
-  provider      String    @default("")
+  message       String       @default("")
+  provider      String       @default("")
   /// draft | pending | accepted | declined | withdrawn
-  status        String    @default("draft")
+  status        String       @default("draft")
   /// Note the connector forwards to the target when accepting (or a reason when declining)
-  connectorNote String    @default("")
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  connectorNote String       @default("")
+  /// warm: via a mutual connector | direct: straight to an opportunity's author (connector = target)
+  mode          String       @default("warm")
+  opportunityId String?
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
   respondedAt   DateTime?
 
   @@index([connectorId, status])

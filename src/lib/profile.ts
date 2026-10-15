@@ -6,7 +6,7 @@ import { isHelpful } from "./posts";
 export async function getTrackRecord(userId: string): Promise<TrackRecord & { score: number; tier: ReturnType<typeof reputationTier> }> {
   const [dealsClosed, introsMade, posts] = await Promise.all([
     prisma.deal.count({ where: { stage: "committed", workspace: { ownerId: userId } } }),
-    prisma.intro.count({ where: { connectorId: userId, status: "accepted" } }),
+    prisma.intro.count({ where: { connectorId: userId, status: "accepted", mode: "warm" } }),
     prisma.post.findMany({ where: { authorId: userId }, select: { _count: { select: { likes: true, recasts: true, replies: true } } } }),
   ]);
   const helpfulPosts = posts.filter((p) => isHelpful({ likes: p._count.likes, recasts: p._count.recasts, replies: p._count.replies })).length;

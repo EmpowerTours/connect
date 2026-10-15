@@ -17,7 +17,6 @@ import { slugify } from "@/lib/slug";
 import { extractCashtags, matchOrgs } from "@/lib/tagging";
 import { applyIntroAction, validateIntroRequest, type IntroAction } from "@/lib/intros";
 import { extractMentions, isPostKind, threadIdsFor, validatePostBody } from "@/lib/posts";
-import { validateOpportunity } from "@/lib/opportunities";
 
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
 
@@ -445,7 +444,17 @@ export async function sendIntroAction(fd: FormData) {
 
 export async function respondIntroAction(fd: FormData) {
   const action = str(fd, "decision") === "accept" ? "accept" : "decline";
-  await transitionIntro(str(fd, "introId"), action, { connectorNote: str(fd, "note") });
+  const intro = await transitionIntro(str(fd, "introId"), action, { connectorNote: str(fd, "note") });
+  // A direct request accepted by the author connects the two members (mutual follow).
+  if (action === "accept" && intro.mode === "direct") {
+    const a = intro.requesterId;
+    const b = intro.targetId;
+    await prisma.$transaction([
+      prisma.followUser.upsert({ where: { followerId_followeeId: { followerId: a, followeeId: b } }, create: { followerId: a, followeeId: b }, update: {} }),
+      prisma.followUser.upsert({ where: { followerId_followeeId: { followerId: b, followeeId: a } }, create: { followerId: b, followeeId: a }, update: {} }),
+    ]);
+    revalidatePath("/", "layout");
+  }
 }
 
 export async function withdrawIntroAction(fd: FormData) {
@@ -479,18 +488,4 @@ export async function ingestNowAction() {
   await requireUser();
   await ingestAllFeeds(prisma);
   revalidatePath("/", "layout");
-}
-
-/* ---------- opportunities (asks & offers) ---------- */
-
-export async function createOpportunityAction(fd: FormData) {
-  const user = await requireUser();
-  const backRaw = str(fd, "back");
-  const back = backRaw.startsWith("/opportunities") ? backRaw : "/opportunities";
-  const r = validateOpportunity({ kind: str(fd, "kind"), headline: str(fd, "headline"), body: str(fd, "body"), region: str(fd, "region") });
-  if (!r.ok) redirect(`${back}${back.includes("?") ? "&" : "?"}new=1&error=${r.error}`);
-  const orgName = str(fd, "orgName").trim().slice(0, 80) || user.orgName;
-  await prisma.opportunity.create({ data: { ...r.value, orgName, orgId: orgName === user.orgName ? (user.orgId ?? null) : null, authorId: user.id } });
-  revalidatePath("/opportunities");
-  redirect(back);
 }
