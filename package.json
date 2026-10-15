@@ -11,6 +11,7 @@
     "test": "vitest run",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
+    "seed:demo": "tsx prisma/seed-demo.ts",
     "db:reset": "prisma db push --force-reset && tsx prisma/seed.ts",
     "ingest": "tsx scripts/ingest.ts",
     "setup": "prisma db push && tsx prisma/seed.ts",
@@ -32,6 +33,7 @@
     "react-dom": "19.1.0",
     "rss-parser": "^3.13.0",
     "server-only": "^0.0.1",
+    "sharp": "^0.35.5",
     "viem": "^2.57.7",
     "zod": "^4.6.7"
   },

@@ -96,7 +96,10 @@ export async function ensureUser(email: string) {
   if (existing) return existing;
   const taken = new Set((await prisma.user.findMany({ select: { handle: true } })).map((u) => u.handle));
   const handle = handleFromEmail(normalized, taken);
-  const user = await prisma.user.create({ data: { email: normalized, name: handle, handle } });
+  const isDemo = normalized === DEMO_EMAIL;
+  const user = await prisma.user.create({
+    data: isDemo ? { email: normalized, name: "Demo user", handle: taken.has("demo") ? handle : "demo", isDemo } : { email: normalized, name: handle, handle },
+  });
   await getWorkspace(user.id);
   return user;
 }

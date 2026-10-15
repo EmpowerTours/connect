@@ -16,14 +16,15 @@ Next.js 15 (App Router, server actions) · TypeScript · Tailwind CSS v4 · Pris
 cd bdnet
 npm install            # also runs prisma generate
 cp .env.example .env   # only DATABASE_URL is needed
-npm run setup          # create SQLite DB + seed 53 orgs, RSS feeds, demo user/pipeline, demo network
+npm run setup          # create SQLite DB + seed 53 real orgs, RSS feeds, topic channels (no people)
+npm run seed:demo      # optional, LOCAL ONLY: fictional demo people, asks/offers, intros, demo pipeline
 npm run logos          # optional: fetch org favicons into public/logos (already committed)
 npm run ingest         # optional: pull public RSS news and tag it to orgs
 npm run dev            # http://localhost:3000 → "Continue as demo user" (local demo, no wallet)
 ```
 Other scripts: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, `npm run db:reset`, `npm run screenshots` (needs a running server + Chrome; see `scripts/screenshots.ts`).
 
-`SEED_DEMO=0 npm run db:seed` seeds only the directory and feeds (no demo user/pipeline).
+The default seed (`db:seed`, `setup`, `db:reset`) creates **no people and no content**: only the 53 public-fact organizations, the public news feeds and topic channels. Fictional demo people are only added by `npm run seed:demo`, which refuses to run with `NODE_ENV=production`.
 
 ## Features
 **Navigation:** mobile has a floating three-tab bar (Today, Opportunities, Circle) and an avatar menu (`/more`) for Intros, Updates, Channels, My deals, Organizations, Signals, profile and language. Desktop uses a slim side rail and a centered single column. Light theme, light-purple accent (#7C3AED for text and buttons, #A78BFA / #C4B5FD for tints), frosted-glass cards.
@@ -41,7 +42,7 @@ Other scripts: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`,
 - **Design:** high-contrast dark theme, one violet accent, Inter (self-hosted), initials avatars, favicon logos with initials fallback, empty states, a shimmer skeleton while AI drafts, small motion on likes/menus.
 
 ### Demo content (clearly labelled)
-The seed adds 8 **fictional** people at fictional companies (Quetzal Rails, Banco Meridiano, Harbor Asset Management, …), their updates, channels, intros, and asks/offers. Every demo account carries a **Demo** badge and a profile note. No real people are impersonated; real organizations only appear as `$tags` in questions and opinions, and real org pages show no people until someone verifies.
+`npm run seed:demo` adds 8 **fictional** people at fictional companies (Quetzal Rails, Banco Meridiano, Harbor Asset Management, …), their updates, channels, intros, and asks/offers. Every demo account carries a **Demo** badge and a profile note. No real people are impersonated; real organizations only appear as `$tags` in questions and opinions, and real org pages show no people until someone verifies.
 
 ## What's mocked / not done
 - No real email delivery (magic link shown on screen). No real verification: work email, LinkedIn, wallet and org verification are placeholders shown as "unverified".
@@ -55,7 +56,9 @@ The seed adds 8 **fictional** people at fictional companies (Quetzal Rails, Banc
 ```
 prisma/schema.prisma      data model (SQLite)
 prisma/seed-data.ts       53 public-fact orgs
-prisma/seed.ts            seed script (+ demo pipeline)
+prisma/seed.ts            default/production seed (orgs, feeds, channels; no people)
+prisma/seed-base.ts       the data that seed applies
+prisma/seed-demo.ts       LOCAL ONLY demo seed (demo user, pipeline, demo network)
 prisma/seed-social.ts     fictional demo network: users, channels, updates, intros, asks/offers
 scripts/fetch-logos.ts    favicon fetcher → public/logos
 scripts/ingest.ts         RSS ingestion CLI

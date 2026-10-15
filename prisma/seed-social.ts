@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { extractCashtags } from "../src/lib/tagging";
 import { extractMentions } from "../src/lib/posts";
+import { CHANNELS } from "./seed-base";
 
 /**
  * Demo social graph. EVERY person here is fictional and flagged isDemo (shown
@@ -8,16 +9,6 @@ import { extractMentions } from "../src/lib/posts";
  * organizations appear only as $tags in questions/opinions — no invented facts
  * about them.
  */
-export const CHANNELS = [
-  { slug: "stablecoins", name: "Stablecoins", description: "Issuance, rails, reserves and regulation." },
-  { slug: "tokenization", name: "Tokenization", description: "Tokenized deposits, funds and securities." },
-  { slug: "rwa", name: "RWA", description: "Real-world assets onchain: issuers, transfer agents, distribution." },
-  { slug: "latam-payments", name: "LatAm payments", description: "SPEI, PIX, remittance corridors and on/off-ramps." },
-  { slug: "custody", name: "Custody", description: "Qualified custody, MPC, staking and ops." },
-  { slug: "monad", name: "Monad", description: "Building and partnering in the Monad ecosystem." },
-  { slug: "market-structure", name: "Market structure", description: "Exchanges, clearing, settlement and market infra." },
-  { slug: "bd-craft", name: "BD craft", description: "Playbooks, outreach, procurement and closing institutional deals." },
-];
 
 const DEMO_USERS = [
   { handle: "valeria", name: "Valeria Ortiz", headline: "Head of Partnerships", orgName: "Quetzal Rails", location: "Mexico City", bio: "Building stablecoin payout rails for SMEs. Ex-payments ops." },
