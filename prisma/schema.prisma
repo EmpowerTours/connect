@@ -14,7 +14,8 @@ datasource db {
 
 model User {
   id                 String   @id @default(cuid())
-  email              String   @unique
+  /// Optional: Mera passkey accounts are identified by wallet, not email.
+  email              String?  @unique
   name               String
   handle             String   @unique
   role               String   @default("")
@@ -35,8 +36,13 @@ model User {
   /// Proof placeholders — all false until real verification ships.
   workEmailVerified  Boolean  @default(false)
   linkedinVerified   Boolean  @default(false)
-  walletAddress      String   @default("")
+  /// Lowercased EVM address of the user's Mera passkey wallet (Monad).
+  /// Only ever written after a server-verified EIP-712 signature.
+  walletAddress      String?  @unique
   walletVerified     Boolean  @default(false)
+  walletVerifiedAt   DateTime?
+  /// WebAuthn credential id of the Mera passkey (base64url). Informational.
+  passkeyCredentialId String?
   createdAt          DateTime @default(now())
 
   likes            Like[]

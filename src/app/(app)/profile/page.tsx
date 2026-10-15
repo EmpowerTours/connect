@@ -1,6 +1,8 @@
 import { updateProfileAction } from "@/app/actions";
 import { UserAvatar } from "@/components/avatar";
 import { ProofBadges } from "@/components/badges";
+import { MeraLinkWallet } from "@/components/mera-sign-in";
+import { VerifiedOnMonad } from "@/components/wallet-badge";
 import { Columns, PageHeader } from "@/components/layout";
 import { SubmitButton } from "@/components/submit-button";
 import { getLocale, requireUser } from "@/lib/auth";
@@ -41,12 +43,27 @@ export default async function EditProfilePage({ searchParams }: { searchParams: 
           <label className={`${field} sm:col-span-2`}><span className="label">{t(locale, "profile.voice")}</span><textarea name="voice" defaultValue={user.voice} rows={2} placeholder="Short, direct, no buzzwords…" className="input" /></label>
           <div className="sm:col-span-2"><SubmitButton className="btn-primary">{t(locale, "profile.save")}</SubmitButton></div>
         </form>
+        <section id="wallet" className="glass p-4">
+          <h2 className="mb-1 font-bold">{t(locale, "wallet.mera")}</h2>
+          {user.walletVerified && user.walletAddress ? (
+            <>
+              <p className="mb-3 text-sm text-faint">{t(locale, "wallet.verifiedHint")}</p>
+              <VerifiedOnMonad user={user} locale={locale} />
+              <p className="mt-2 break-all font-mono text-xs text-faint">{user.walletAddress}</p>
+            </>
+          ) : (
+            <>
+              <p className="mb-3 text-sm text-faint">{t(locale, "wallet.linkHint")}</p>
+              <MeraLinkWallet locale={locale} displayName={user.name} />
+            </>
+          )}
+        </section>
         <section className="card p-4">
           <h2 className="mb-1 font-bold">{t(locale, "proof.title")}</h2>
           <p className="mb-3 text-sm text-faint">{t(locale, "profile.verifyHint")}</p>
           <ProofBadges user={user} locale={locale} />
           <div className="mt-3 flex flex-wrap gap-2">
-            {[t(locale, "proof.workEmail"), "LinkedIn", t(locale, "proof.wallet")].map((m) => (
+            {[t(locale, "proof.workEmail"), "LinkedIn"].map((m) => (
               <button key={m} disabled className="btn-secondary h-8 text-xs" title={t(locale, "proof.soon")}>{t(locale, "proof.verifyWith")} {m}</button>
             ))}
           </div>

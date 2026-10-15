@@ -4,6 +4,7 @@ import { CalendarDays, Check, Handshake, KanbanSquare, MapPin, MessageSquareText
 import { toggleFollowUserAction } from "@/app/actions";
 import { UserAvatar } from "@/components/avatar";
 import { DemoBadge, ProofBadges, VerifiedTick } from "@/components/badges";
+import { VerifiedOnMonad } from "@/components/wallet-badge";
 import { EmptyState } from "@/components/empty-state";
 import { IntroModal } from "@/components/intro-modal";
 import { Columns, PageHeader, Tabs } from "@/components/layout";
@@ -84,6 +85,17 @@ export default async function ProfilePage({
               {user.name} <VerifiedTick verified={verified} /> {user.isDemo && <DemoBadge locale={locale} />}
             </h2>
             <p className="text-[15px] text-faint">@{user.handle}</p>
+            {user.walletVerified && user.walletAddress ? (
+              <div className="mt-2.5">
+                <VerifiedOnMonad user={user} locale={locale} />
+              </div>
+            ) : (
+              isMe && (
+                <Link href="/profile#wallet" className="mt-2.5 inline-flex items-center gap-1.5 rounded-full border border-dashed border-lilac px-3 py-1 text-[13px] font-medium text-accent hover:bg-accent-soft">
+                  {t(locale, "wallet.link")} →
+                </Link>
+              )
+            )}
             {(user.headline || user.orgName) && (
               <p className="mt-2 text-[16px] font-medium">
                 {user.headline}
@@ -118,14 +130,14 @@ export default async function ProfilePage({
               </div>
             )}
             <div className="mt-4">
-              <ProofBadges user={user} locale={locale} />
+              <ProofBadges user={user} locale={locale} showWallet={false} />
             </div>
           </div>
 
           <div className="mt-4 rounded-2xl border border-line bg-raised/50 p-4">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-[15px] font-bold">{t(locale, "track.title")}</h3>
-              <span className="chip border-accent/40 text-violet-200">{t(locale, `tier.${record.tier}`)} · {record.score}</span>
+              <span className="chip border-accent/40 text-accent-ink">{t(locale, `tier.${record.tier}`)} · {record.score}</span>
             </div>
             <ul className="grid grid-cols-3 gap-2">
               {stats.map(({ icon: Icon, value, label, hint }) => (

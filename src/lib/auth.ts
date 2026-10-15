@@ -3,38 +3,72 @@ import { randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "./db";
-import { MAGIC_LINK_TTL_MS, SESSION_TTL_MS, handleFromEmail, isLinkUsable, normalizeEmail } from "./auth-core";
+import { SESSION_TTL_MS, devLoginAllowed, handleFromEmail, normalizeEmail } from "./auth-core";
+import { BRAND } from "./brand";
 import { isLocale, type Locale } from "./i18n";
+import { MERA_SESSION_COOKIE, readSession } from "./mera/session";
 
-export const SESSION_COOKIE = "corridor_session";
-export const LANG_COOKIE = "corridor_lang";
+/**
+ * Two ways to hold a session:
+ *
+ * 1. Mera passkey wallet (the real one). An HMAC-signed cookie minted by
+ *    /api/auth/session after a server-verified EIP-712 signature; it names a
+ *    wallet, and the user is the profile linked to that wallet.
+ * 2. LOCAL DEMO login (dev only). A DB-backed cookie for the seeded demo user.
+ *    Ignored entirely when devLoginAllowed() is false (production builds
+ *    without ALLOW_DEV_LOGIN=1), so it cannot be used to bypass Mera.
+ */
+export const DEMO_SESSION_COOKIE = `${BRAND.subdomain}_demo_session`;
+export const LANG_COOKIE = `${BRAND.subdomain}_lang`;
+export const DEMO_EMAIL = "demo@corridor.local";
 
 function token() {
   return randomBytes(32).toString("hex");
 }
 
-export async function createSession(userId: string) {
+/** Local demo login only. */
+export async function createDemoSession(userId: string) {
+  if (!devLoginAllowed()) throw new Error("demo login is disabled");
   const id = token();
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
   await prisma.session.create({ data: { id, userId, expiresAt } });
-  (await cookies()).set(SESSION_COOKIE, id, { httpOnly: true, sameSite: "lax", path: "/", expires: expiresAt });
+  (await cookies()).set(DEMO_SESSION_COOKIE, id, { httpOnly: true, sameSite: "lax", path: "/", expires: expiresAt });
 }
 
 export async function destroySession() {
   const jar = await cookies();
-  const id = jar.get(SESSION_COOKIE)?.value;
+  const id = jar.get(DEMO_SESSION_COOKIE)?.value;
   if (id) await prisma.session.deleteMany({ where: { id } });
-  jar.delete(SESSION_COOKIE);
+  jar.delete(DEMO_SESSION_COOKIE);
+  jar.delete(MERA_SESSION_COOKIE);
+}
+
+export type AuthMethod = "mera" | "demo";
+
+export async function getCurrentAuth() {
+  const jar = await cookies();
+
+  const mera = readSession(jar.get(MERA_SESSION_COOKIE)?.value);
+  if (mera.ok) {
+    const user = await prisma.user.findUnique({ where: { walletAddress: mera.wallet } });
+    if (user && user.walletVerified) return { user, method: "mera" as AuthMethod };
+  }
+
+  if (devLoginAllowed()) {
+    const id = jar.get(DEMO_SESSION_COOKIE)?.value;
+    if (id) {
+      const session = await prisma.session.findUnique({ where: { id }, include: { user: true } });
+      if (session && session.expiresAt > new Date()) return { user: session.user, method: "demo" as AuthMethod };
+    }
+  }
+  return null;
 }
 
 export async function getCurrentUser() {
-  const id = (await cookies()).get(SESSION_COOKIE)?.value;
-  if (!id) return null;
-  const session = await prisma.session.findUnique({ where: { id }, include: { user: true } });
-  if (!session || session.expiresAt < new Date()) return null;
-  return session.user;
+  return (await getCurrentAuth())?.user ?? null;
 }
 
+/** Every write action goes through this: no session, no write. */
 export async function requireUser() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
@@ -55,6 +89,7 @@ export async function getWorkspace(userId: string) {
   );
 }
 
+/** Used by the local demo login to find/create the seeded demo user. */
 export async function ensureUser(email: string) {
   const normalized = normalizeEmail(email);
   const existing = await prisma.user.findUnique({ where: { email: normalized } });
@@ -64,17 +99,4 @@ export async function ensureUser(email: string) {
   const user = await prisma.user.create({ data: { email: normalized, name: handle, handle } });
   await getWorkspace(user.id);
   return user;
-}
-
-export async function issueMagicLink(email: string): Promise<string> {
-  const t = token();
-  await prisma.magicLink.create({ data: { token: t, email: normalizeEmail(email), expiresAt: new Date(Date.now() + MAGIC_LINK_TTL_MS) } });
-  return t;
-}
-
-export async function consumeMagicLink(t: string): Promise<string | null> {
-  const link = await prisma.magicLink.findUnique({ where: { token: t } });
-  if (!link || !isLinkUsable(link)) return null;
-  await prisma.magicLink.update({ where: { token: t }, data: { usedAt: new Date() } });
-  return link.email;
 }

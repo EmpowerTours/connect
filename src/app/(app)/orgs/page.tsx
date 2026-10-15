@@ -48,7 +48,7 @@ export default async function OrgsPage({ searchParams }: { searchParams: Promise
         </form>
         <div className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4">
           {["", ...ORG_TYPES].map((ty) => (
-            <Link key={ty || "all"} href={typeHref(ty)} className={`shrink-0 rounded-full border px-3 py-1 text-[13px] font-medium transition ${type === ty ? "border-accent bg-accent-soft text-violet-100" : "border-line text-muted hover:text-fg"}`}>
+            <Link key={ty || "all"} href={typeHref(ty)} className={`shrink-0 rounded-full border px-3 py-1 text-[13px] font-medium transition ${type === ty ? "border-accent bg-accent-soft text-accent-ink" : "border-line text-muted hover:text-fg"}`}>
               {ty ? ORG_TYPE_LABELS[locale][ty] : t(locale, "directory.allTypes")}
             </Link>
           ))}
@@ -67,7 +67,7 @@ export default async function OrgsPage({ searchParams }: { searchParams: Promise
                 </span>
               </span>
               <span className="flex shrink-0 flex-col items-end gap-1 text-xs text-faint">
-                {o.deals[0] && <span className="chip border-accent/40 text-violet-200">{t(locale, "directory.inPipeline")}</span>}
+                {o.deals[0] && <span className="chip border-accent/40 text-accent-ink">{t(locale, "directory.inPipeline")}</span>}
                 {o.followers.length > 0 && <span>{t(locale, "org.unfollow")}</span>}
               </span>
             </Link>

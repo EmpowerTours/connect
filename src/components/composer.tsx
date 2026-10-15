@@ -103,7 +103,7 @@ export function Composer({ locale, channels, parentId, quoteOfId, defaultChannel
                   onClick={() => setKind(on ? "" : k)}
                   aria-pressed={on}
                   className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition active:scale-95 ${
-                    on ? "border-accent bg-accent-soft text-violet-100" : "border-line text-muted hover:border-line-strong hover:text-fg"
+                    on ? "border-accent bg-accent-soft text-accent-ink" : "border-line text-muted hover:border-line-strong hover:text-fg"
                   }`}
                 >
                   <Icon size={12} />

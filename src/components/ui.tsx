@@ -22,7 +22,7 @@ export function StageDot({ stage }: { stage: Stage }) {
 const DUE_COLORS: Record<DueStatus, string> = {
   overdue: "border-red-300 text-red-700 bg-red-50",
   today: "border-amber-300 text-amber-800 bg-amber-50",
-  soon: "border-accent/40 text-violet-200",
+  soon: "border-accent/40 text-accent-ink",
   later: "border-line text-muted",
   none: "border-line text-faint",
 };

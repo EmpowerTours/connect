@@ -32,3 +32,16 @@ export function handleFromEmail(email: string, taken: Set<string>): string {
 export function devLoginAllowed(env: Record<string, string | undefined> = process.env): boolean {
   return env.NODE_ENV !== "production" || env.ALLOW_DEV_LOGIN === "1";
 }
+
+/** Derives a unique handle from a display name (Mera sign-up has no email). */
+export function handleFromName(name: string, taken: Set<string>): string {
+  const base =
+    name
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 20) || "member";
+  return handleFromEmail(`${base.length >= 2 ? base : `${base}_member`}@x`, taken);
+}

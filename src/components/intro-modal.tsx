@@ -100,7 +100,7 @@ export async function IntroModal({
               <input type="hidden" name="introId" value={draft.id} />
               <div className="flex items-center justify-between">
                 <span className="label mb-0">{t(locale, "introModal.message").replace("{name}", draft.connector.name.split(" ")[0])}</span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-violet-200">
+                <span className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-ink">
                   <Sparkles size={11} /> {t(locale, "introModal.aiDrafted")} · {draft.provider}
                 </span>
               </div>

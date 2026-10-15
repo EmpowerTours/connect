@@ -1,15 +1,17 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Handshake, Hash, KanbanSquare } from "lucide-react";
-import { devLoginAction, requestMagicLinkAction, setLocaleAction } from "@/app/actions";
+import { FlaskConical, Fingerprint, Handshake, Hash, KanbanSquare, Lock } from "lucide-react";
+import { devLoginAction, setLocaleAction } from "@/app/actions";
+import { MeraSignIn } from "@/components/mera-sign-in";
 import { devLoginAllowed } from "@/lib/auth-core";
 import { getCurrentUser, getLocale } from "@/lib/auth";
-import { APP_NAME } from "@/lib/constants";
+import { APP_HOST, APP_NAME, BRAND } from "@/lib/brand";
 import { t } from "@/lib/i18n";
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ sent?: string; error?: string }> }) {
+export const dynamic = "force-dynamic";
+
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   if (await getCurrentUser()) redirect("/");
-  const { sent, error } = await searchParams;
+  const { error } = await searchParams;
   const locale = await getLocale();
   const points = [
     { icon: Hash, text: t(locale, "login.point1") },
@@ -17,12 +19,12 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     { icon: KanbanSquare, text: t(locale, "login.point3") },
   ];
   return (
-    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden px-5 py-10">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_0%,rgb(124_92_255/0.25),transparent)]" />
+    <main className="relative flex min-h-dvh justify-center overflow-hidden px-5 pb-10 pt-5 sm:items-center">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(70%_45%_at_50%_0%,rgb(196_181_253/0.55),transparent),radial-gradient(60%_40%_at_100%_100%,rgb(167_139_250/0.25),transparent)]" />
       <div className="relative w-full max-w-[400px]">
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-5 flex items-center justify-between">
           <div className="flex items-center gap-2.5 text-xl font-bold tracking-tight">
-            <span className="relative inline-flex h-8 w-8 items-center justify-center rounded-xl bg-accent"><span className="h-3 w-3 rounded-full bg-white" /></span>
+            <span className="relative inline-flex h-8 w-8 items-center justify-center rounded-xl bg-accent shadow-[0_6px_16px_-6px_rgb(124_58_237/0.7)]"><span className="h-3 w-3 rounded-full bg-white" /></span>
             {APP_NAME}
           </div>
           <form action={setLocaleAction}>
@@ -30,38 +32,57 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             <button className="btn-ghost h-9 px-3 text-xs">{locale === "en" ? "ES" : "EN"}</button>
           </form>
         </div>
-        <h1 className="text-[28px] font-bold leading-tight tracking-tight">{t(locale, "app.tagline")}</h1>
-        <ul className="mt-5 space-y-2.5">
+
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-lilac bg-white/70 px-2.5 py-1 text-xs font-semibold text-accent-ink">
+          <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+          {t(locale, "login.poweredBy")}
+        </span>
+        <h1 className="mt-3 text-[25px] font-bold leading-[1.15] tracking-tight">{t(locale, "app.tagline")}</h1>
+        <ul className="mt-3 space-y-1.5">
           {points.map(({ icon: Icon, text }) => (
-            <li key={text} className="flex items-center gap-3 text-[15px] text-muted">
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-accent-soft text-accent"><Icon size={16} /></span>
+            <li key={text} className="flex items-center gap-3 text-[13.5px] leading-snug text-muted">
+              <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent"><Icon size={15} /></span>
               {text}
             </li>
           ))}
         </ul>
-        <div className="card mt-8 space-y-4 p-5">
-          {error === "link" && <p className="rounded-xl bg-danger/10 p-2.5 text-sm text-danger">{t(locale, "login.invalid")}</p>}
-          <form action={requestMagicLinkAction} className="space-y-2.5">
-            <label className="label" htmlFor="email">{t(locale, "login.email")}</label>
-            <input id="email" name="email" type="email" required className="input" placeholder="you@institution.com" />
-            <button className="btn-primary h-11 w-full">{t(locale, "login.send")}</button>
-          </form>
-          <p className="text-xs text-faint">{t(locale, "login.subtitle")}</p>
-          {sent && (
-            <div className="rounded-xl border border-accent/40 bg-accent-soft p-3 text-sm animate-rise">
-              <p className="mb-2 text-fg/90">{t(locale, "login.linkReady")}</p>
-              <Link href={`/auth/verify?token=${encodeURIComponent(sent)}`} className="btn-primary w-full">{t(locale, "login.open")} →</Link>
+
+        <section className="glass mt-5 rounded-3xl border border-white/80 p-5 shadow-[0_20px_50px_-24px_rgb(91_33_182/0.45)]">
+          <div className="mb-4 flex items-start gap-3">
+            <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-lavender to-accent text-white">
+              <Fingerprint size={22} />
+            </span>
+            <div>
+              <h2 className="text-[17px] font-bold leading-tight">{t(locale, "login.mera.title")}</h2>
+              <p className="mt-1 text-[13px] leading-snug text-muted">{t(locale, "login.mera.subtitle")}</p>
             </div>
-          )}
-          {devLoginAllowed() && (
-            <>
-              <div className="flex items-center gap-3 text-xs text-faint"><span className="h-px flex-1 bg-line" />{t(locale, "login.or")}<span className="h-px flex-1 bg-line" /></div>
-              <form action={devLoginAction}>
-                <button className="btn-secondary h-11 w-full">{t(locale, "login.dev")}</button>
-              </form>
-            </>
-          )}
-        </div>
+          </div>
+          {error === "link" && <p className="mb-3 rounded-xl bg-danger/10 p-2.5 text-sm text-danger">{t(locale, "login.invalid")}</p>}
+          <MeraSignIn locale={locale} />
+          <div className="mt-4 flex items-start justify-between gap-3 border-t border-line pt-3">
+            <p className="flex items-start gap-1.5 text-xs leading-snug text-faint">
+              <Lock size={13} className="mt-px shrink-0" />
+              {t(locale, "login.mera.note")}
+            </p>
+            <span className="chip shrink-0 border-lilac text-[11px] text-accent-ink">{t(locale, "login.mera.only")}</span>
+          </div>
+        </section>
+
+        {devLoginAllowed() && (
+          <section className="mt-4 rounded-2xl border border-dashed border-amber-300 bg-amber-50/70 p-4">
+            <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-amber-800">
+              <FlaskConical size={13} /> {t(locale, "login.demo.title")}
+            </p>
+            <p className="mt-1 text-xs leading-snug text-amber-900/80">{t(locale, "login.demo.body")}</p>
+            <form action={devLoginAction} className="mt-3">
+              <button className="btn-secondary h-10 w-full text-sm">{t(locale, "login.dev")}</button>
+            </form>
+          </section>
+        )}
+
+        <p className="mt-6 text-center text-[11px] text-faint">
+          {APP_HOST} · {BRAND.ecosystem}
+        </p>
       </div>
     </main>
   );

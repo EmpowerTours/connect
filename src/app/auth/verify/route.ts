@@ -1,11 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { consumeMagicLink, createSession, ensureUser } from "@/lib/auth";
 
-export async function GET(req: NextRequest) {
-  const token = req.nextUrl.searchParams.get("token") ?? "";
-  const email = token ? await consumeMagicLink(token) : null;
-  if (!email) return NextResponse.redirect(new URL("/login?error=link", req.url));
-  const user = await ensureUser(email);
-  await createSession(user.id);
-  return NextResponse.redirect(new URL("/", req.url));
+/** Email magic links are retired: sign-in is Mera passkey only. Old links land on /login. */
+export function GET(req: NextRequest) {
+  return NextResponse.redirect(new URL("/login?error=link", req.url));
 }

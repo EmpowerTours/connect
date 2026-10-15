@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { devLoginAllowed, isValidEmail } from "@/lib/auth-core";
-import { LANG_COOKIE, createSession, destroySession, ensureUser, getCurrentUser, getWorkspace, issueMagicLink, requireUser } from "@/lib/auth";
+import { devLoginAllowed } from "@/lib/auth-core";
+import { DEMO_EMAIL, LANG_COOKIE, createDemoSession, destroySession, ensureUser, getCurrentUser, getWorkspace, requireUser } from "@/lib/auth";
 import { ADVISOR_INFLUENCE, ACTIVITY_KINDS, ORG_TYPES, regionForCountry } from "@/lib/constants";
 import { prisma } from "@/lib/db";
 import { isLocale } from "@/lib/i18n";
@@ -23,19 +23,15 @@ const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
 
 /* ---------- auth ---------- */
 
-export async function requestMagicLinkAction(fd: FormData) {
-  const email = str(fd, "email");
-  if (!isValidEmail(email)) redirect("/login?error=email");
-  const t = await issueMagicLink(email);
-  // Local MVP: no email provider. The link is logged and shown on the page.
-  console.log(`[magic-link] ${email}: /auth/verify?token=${t}`);
-  redirect(`/login?sent=${encodeURIComponent(t)}`);
-}
+// Sign-in is Mera passkey only (see /api/auth/* and src/lib/mera). Email
+// magic links were removed with the move to Mera wallets.
 
+/** LOCAL DEMO ONLY: one-click login as the seeded demo user, no wallet.
+ *  Refused unless devLoginAllowed() (non-production, or ALLOW_DEV_LOGIN=1). */
 export async function devLoginAction() {
   if (!devLoginAllowed()) redirect("/login?error=dev");
-  const user = await ensureUser("demo@corridor.local");
-  await createSession(user.id);
+  const user = await ensureUser(DEMO_EMAIL);
+  await createDemoSession(user.id);
   redirect("/");
 }
 

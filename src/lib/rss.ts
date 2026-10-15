@@ -1,3 +1,4 @@
+import { BRAND } from "./brand";
 import Parser from "rss-parser";
 
 export interface FeedItem {
@@ -48,7 +49,7 @@ export async function parseFeedXml(xml: string, now: Date = new Date()): Promise
 
 export async function fetchFeed(url: string): Promise<FeedItem[]> {
   const res = await fetch(url, {
-    headers: { "user-agent": "CorridorLocalMVP/0.1 (+rss reader)", accept: "application/rss+xml, application/atom+xml, application/xml, text/xml" },
+    headers: { "user-agent": `${BRAND.ecosystem}${BRAND.name}/0.1 (+rss reader)`, accept: "application/rss+xml, application/atom+xml, application/xml, text/xml" },
     signal: AbortSignal.timeout(15_000),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);

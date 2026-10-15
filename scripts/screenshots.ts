@@ -4,9 +4,13 @@
  * Desktop: 1440x900 @2x. Mobile: 390x844 @3x. PNG, viewport-sized, never downscaled.
  * Needs a Chrome/Chromium binary (CHROME_PATH, default /usr/bin/google-chrome).
  * The server must allow dev login (next dev, or ALLOW_DEV_LOGIN=1 next start).
+ * For the wallet shot the server also needs AUTH_SESSION_SECRET (any 32+ chars).
+ * ONLY=auth captures just the sign-in and wallet-profile shots.
  */
 import path from "node:path";
 import { chromium, type Page } from "playwright-core";
+import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
+import { LINK_STATEMENT, sessionTypedData } from "../src/lib/mera/typed-data";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:3000";
 const OUT = process.env.OUT_DIR ?? path.resolve(process.cwd(), "..");
@@ -42,12 +46,43 @@ async function shot(page: Page, url: string, name: string) {
   console.log("wrote", file(name));
 }
 
+/**
+ * A headless browser cannot run a real passkey ceremony, so for the wallet
+ * shot a throwaway in-memory key stands in for the passkey-derived key. It
+ * signs the same off-chain EIP-712 link message the browser would, and the
+ * server verifies it through the real /api/auth/link route. No transaction;
+ * the key is discarded when the script exits.
+ */
+async function linkThrowawayWallet(page: Page): Promise<string> {
+  const account = privateKeyToAccount(generatePrivateKey());
+  const { nonce, serverTs } = (await (await page.request.get(`${BASE}/api/auth/nonce`)).json()) as { nonce: string; serverTs: number };
+  const signature = await account.signTypedData(sessionTypedData({ wallet: account.address, clientTs: serverTs, nonce, statement: LINK_STATEMENT }));
+  const res = await page.request.post(`${BASE}/api/auth/link`, {
+    data: { wallet: account.address, statement: LINK_STATEMENT, clientTs: serverTs, nonce, signature },
+  });
+  if (!res.ok()) throw new Error(`link failed: ${res.status()} ${await res.text()}`);
+  const me = (await (await page.request.get(`${BASE}/api/auth/session`)).json()) as { user: { handle: string }; method: string };
+  console.log("linked", account.address, "to", me.user.handle, "session:", me.method);
+  return me.user.handle;
+}
+
 async function main() {
   const browser = await chromium.launch({ executablePath: CHROME, headless: true });
 
-  const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, colorScheme: "light" });
+  const mobileOpts = { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, colorScheme: "light" } as const;
+
+  const anon = await (await browser.newContext(mobileOpts)).newPage();
+  await shot(anon, "/login", "signin-mobile");
+
+  const mobile = await browser.newContext(mobileOpts);
   const m = await mobile.newPage();
   await login(m);
+  const handle = await linkThrowawayWallet(m);
+  await shot(m, `/u/${handle}`, "profile-wallet-mobile");
+  if (process.env.ONLY === "auth") {
+    await browser.close();
+    return;
+  }
   await shot(m, "/", "today-mobile");
   await shot(m, "/opportunities", "opportunities-mobile");
   await shot(m, "/circle", "circle-mobile");

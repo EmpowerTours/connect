@@ -1,6 +1,7 @@
 import { BadgeCheck, BriefcaseBusiness, IdCard, Mail, Rocket, Search, Sparkles, Wallet } from "lucide-react";
 import { t, type Locale } from "@/lib/i18n";
 import type { PostKind } from "@/lib/posts";
+import { VerifiedOnMonad } from "./wallet-badge";
 
 export function DemoBadge({ locale, className = "" }: { locale: Locale; className?: string }) {
   return (
@@ -24,7 +25,7 @@ export function PostKindChip({ kind, locale }: { kind: string; locale: Locale })
   if (!(kind in KIND_ICON)) return null;
   const Icon = KIND_ICON[kind as PostKind];
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-violet-200">
+    <span className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-ink">
       <Icon size={11} strokeWidth={2.4} />
       {t(locale, `kind.${kind as PostKind}`)}
     </span>
@@ -40,23 +41,32 @@ export function VerifiedTick({ verified }: { verified: boolean }) {
 export function ProofBadges({
   user,
   locale,
+  showWallet = true,
 }: {
-  user: { workEmailVerified: boolean; linkedinVerified: boolean; walletVerified: boolean; walletAddress: string };
+  user: { workEmailVerified: boolean; linkedinVerified: boolean; walletVerified: boolean; walletAddress: string | null };
   locale: Locale;
+  /** false where the Verified on Monad badge is already shown prominently. */
+  showWallet?: boolean;
 }) {
+  const walletOk = user.walletVerified && !!user.walletAddress;
   const items = [
     { key: "email", icon: Mail, label: t(locale, "proof.workEmail"), ok: user.workEmailVerified },
     { key: "linkedin", icon: IdCard, label: "LinkedIn", ok: user.linkedinVerified },
-    { key: "wallet", icon: Wallet, label: t(locale, "proof.wallet"), ok: user.walletVerified },
+    ...(walletOk ? [] : [{ key: "wallet", icon: Wallet, label: t(locale, "wallet.mera"), ok: false }]),
   ];
   return (
-    <ul className="flex flex-wrap gap-1.5">
+    <ul className="flex flex-wrap items-center gap-1.5">
+      {walletOk && showWallet && (
+        <li>
+          <VerifiedOnMonad user={user} locale={locale} size="sm" />
+        </li>
+      )}
       {items.map(({ key, icon: Icon, label, ok }) => (
         <li
           key={key}
           title={ok ? t(locale, "proof.verified") : t(locale, "proof.unverifiedHint")}
           className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${
-            ok ? "border-accent/40 bg-accent-soft text-violet-100" : "border-dashed border-line-strong text-faint"
+            ok ? "border-accent/40 bg-accent-soft text-accent-ink" : "border-dashed border-line-strong text-faint"
           }`}
         >
           <Icon size={13} />

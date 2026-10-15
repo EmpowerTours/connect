@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Keep the dev-mode "N" bubble out of the UI and screenshots.
+  devIndicators: false,
 };
 
 export default nextConfig;

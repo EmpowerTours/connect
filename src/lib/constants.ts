@@ -1,4 +1,4 @@
-export const APP_NAME = "Corridor";
+export { APP_NAME } from "./brand";
 
 export const ORG_TYPES = [
   "foundation",
