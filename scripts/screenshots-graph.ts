@@ -126,14 +126,36 @@ async function login(api: APIRequestContext, acct: PrivateKeyAccount) {
   if (!res.ok()) throw new Error(`login failed ${res.status()} ${await res.text()}`);
 }
 
+/**
+ * GET JSON, retrying a couple of times: `next dev` occasionally answers with its HTML error
+ * page while it recompiles. Reported, never swallowed: the third failure throws.
+ */
+async function getJson(api: APIRequestContext, url: string): Promise<unknown> {
+  for (let attempt = 1; ; attempt++) {
+    const res = await api.get(url);
+    const type = res.headers()["content-type"] ?? "";
+    if (res.ok() && type.includes("application/json")) return res.json();
+    console.warn(`GET ${url} -> ${res.status()} ${type} (attempt ${attempt})`);
+    if (attempt === 3) throw new Error(`GET ${url} failed: ${res.status()}`);
+    await sleep(1500);
+  }
+}
+
 /** Exactly what signGraphUpdates() does in the browser, with the throwaway key. */
 async function signGraph(api: APIRequestContext, acct: PrivateKeyAccount): Promise<number> {
-  const pending = (await (await api.get(`${BASE}/api/graph/pending`)).json()) as { messages: GraphMessage[] };
+  const pending = (await getJson(api, `${BASE}/api/graph/pending`)) as { messages: GraphMessage[] };
   if (!pending.messages?.length) return 0;
   const items = [];
   for (const m of pending.messages) items.push({ message: m, signature: await acct.signTypedData(graphTypedData(m)) });
-  const res = await api.post(`${BASE}/api/graph/sign`, { data: { items } });
-  if (!res.ok()) throw new Error(`sign failed ${res.status()} ${await res.text()}`);
+  let res = await api.post(`${BASE}/api/graph/sign`, { data: { items } });
+  // Same dev-server hiccup as getJson: an HTML 500 means the route never ran, so one retry is safe
+  // (and a duplicate would be refused anyway: each (author, seq) is unique).
+  if (res.status() === 500 && (res.headers()["content-type"] ?? "").includes("text/html")) {
+    console.warn("POST /api/graph/sign -> dev server error page, retrying once");
+    await sleep(1500);
+    res = await api.post(`${BASE}/api/graph/sign`, { data: { items } });
+  }
+  if (!res.ok()) throw new Error(`sign failed ${res.status()} ${(await res.text()).slice(0, 300)}`);
   return items.length;
 }
 
@@ -201,6 +223,68 @@ async function seedScenario(db: PrismaClient) {
   await db.followUser.createMany({ data: [{ followerId: priya.id, followeeId: valeria.id }, { followerId: mei.id, followeeId: valeria.id }] });
 }
 
+
+/**
+ * On each app page (390x844): with the page scrolled to the end, no button, link-button or
+ * form control may sit under the floating tab bar; and sticky action bars must stay clear of
+ * it at every scroll position. Returns human-readable failures.
+ */
+async function checkTabBar(page: Page, db: PrismaClient): Promise<string[]> {
+  const post = await db.post.findFirstOrThrow({ where: { parentId: null, replies: { some: {} } }, select: { id: true } });
+  const opp = await db.opportunity.findFirst({ select: { id: true } });
+  const pages = ["/", "/opportunities", "/circle", "/updates", "/updates?tab=all", "/channels", "/channels/stablecoins", "/compose", "/import", "/sync", "/profile", "/more", "/intros", "/pipeline", "/directory", "/orgs", "/orgs/quetzal-rails", "/signals", "/u/valeria", `/post/${post.id}`, ...(opp ? [`/opportunities/${opp.id}`] : [])];
+  const failures: string[] = [];
+  // tsx (esbuild keepNames) wraps the named helpers below in __name(); give the page a no-op one.
+  await page.addInitScript("window.__name = (f) => f");
+  for (const url of pages) {
+    await page.goto(`${BASE}${url}`);
+    await page.waitForLoadState("networkidle");
+    await page.evaluate(() => document.querySelector("[data-testid=feed-picker] details")?.setAttribute("open", ""));
+    await page.waitForTimeout(300);
+    const steps = await page.evaluate(() => Math.ceil((document.documentElement.scrollHeight - innerHeight) / 200));
+    for (let i = 0; i <= steps; i++) {
+      const atEnd = i === steps;
+      const hits = await page.evaluate((end) => {
+        window.scrollTo(0, end ? document.documentElement.scrollHeight : window.scrollY + 200);
+        const nav = document.querySelector("nav[aria-label=Primary]");
+        if (!nav || getComputedStyle(nav).display === "none") return [];
+        const bar = nav.getBoundingClientRect();
+        // The part of an element actually on screen: clipped by every scrolling/clipping ancestor.
+        const visibleRect = (el: Element) => {
+          const r = el.getBoundingClientRect();
+          let { top, bottom, left, right } = r;
+          for (let a = el.parentElement; a; a = a.parentElement) {
+            const o = getComputedStyle(a);
+            if (o.overflowX === "visible" && o.overflowY === "visible") continue;
+            const c = a.getBoundingClientRect();
+            top = Math.max(top, c.top);
+            bottom = Math.min(bottom, c.bottom);
+            left = Math.max(left, c.left);
+            right = Math.min(right, c.right);
+          }
+          return { top, bottom, left, right };
+        };
+        const under = (el: Element) => {
+          const r = visibleRect(el);
+          return r.bottom - r.top > 1 && r.right - r.left > 1 && r.bottom > bar.top + 1 && r.top < bar.bottom && r.right > bar.left && r.left < bar.right;
+        };
+        const label = (el: Element) => `${el.tagName.toLowerCase()} "${(el.textContent || el.getAttribute("aria-label") || el.getAttribute("name") || "").trim().slice(0, 40)}"`;
+        const out: string[] = [];
+        // Sticky action bars: never under the bar.
+        for (const el of document.querySelectorAll("[data-testid=import-actions], [data-testid=graph-sign], [data-testid=feed-mutes-actions]")) if (under(el)) out.push(`sticky ${label(el)}`);
+        if (end) {
+          const controls = document.querySelectorAll("main button, main a.btn, main a[class*=btn-], main input:not([type=hidden]):not(.sr-only), main select, main textarea");
+          for (const el of controls) if (!nav.contains(el) && !el.closest("[role=dialog], details:not([open])") && under(el)) out.push(label(el));
+        }
+        return out;
+      }, atEnd);
+      for (const h of hits) failures.push(`${url}${atEnd ? " (end)" : ` (scroll ${i * 200})`}: ${h}`);
+      if (atEnd) break;
+    }
+  }
+  return [...new Set(failures)];
+}
+
 /* ---------- verification screenshot ---------- */
 function runVerify(args: string[]): string {
   const r = spawnSync("npx", ["tsx", "scripts/verify-graph.ts", ...args], { encoding: "utf8" });
@@ -250,6 +334,12 @@ async function main() {
   };
   try {
     await waitForServer();
+    // Compile every route once, one at a time, before the run: next dev compiles on demand and
+    // can serve a half-written manifest when two compiles overlap.
+    for (const route of ["/updates", "/channels/stablecoins", "/import", "/sync", "/graph", "/graph/valeria", "/api/graph/events", "/api/graph/users/valeria", "/api/graph/pending", "/api/auth/nonce"]) {
+      await fetch(`${BASE}${route}`, { redirect: "manual" }).catch(() => {});
+    }
+    await fetch(`${BASE}/api/graph/sign`, { method: "POST", body: "{}", headers: { "content-type": "application/json" } }).catch(() => {});
     const browser = await chromium.launch({ executablePath: CHROME, headless: true });
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, colorScheme: "light", locale: "en-US" });
     const page = await ctx.newPage();
@@ -263,8 +353,17 @@ async function main() {
     await click(page, "input[name=topics][value=custody]");
     await snap(page, "feed-picker-tune");
     for (const [id, name] of [["conversations", "feed-conversations"], ["high_signal", "feed-high-signal"], ["no_bait", "feed-no-bait"]] as const) {
-      await page.locator(`[data-testid=feed-picker] form:has(input[value=${id}]) button`).click();
-      await page.waitForSelector(`[data-testid=feed-picker] form:has(input[value=${id}]) button[aria-checked=true]`);
+      const chosen = `[data-testid=feed-picker] form:has(input[value=${id}]) button[aria-checked=true]`;
+      for (let attempt = 1; ; attempt++) {
+        await page.locator(`[data-testid=feed-picker] form:has(input[value=${id}]) button`).click();
+        const ok = await page.waitForSelector(chosen, { timeout: 12_000 }).then(() => true, () => false);
+        if (ok) break;
+        // next dev sometimes fails a server action while it recompiles; reload and try again.
+        if (attempt === 3) throw new Error(`feed ${id} was not selected`);
+        console.warn(`feed ${id}: not selected yet, retrying`);
+        await page.reload();
+        await page.waitForLoadState("networkidle");
+      }
       await snap(page, name);
     }
     await page.goto(`${BASE}/channels/stablecoins?feed=no_bait`);
@@ -348,6 +447,13 @@ async function main() {
     await page.screenshot({ path: file("graph-verify"), type: "png", fullPage: true });
     console.log("wrote", file("graph-verify"));
     console.log("\n" + clean + "\n\n" + tamperedText);
+
+    /* ----- 4. layout check: the floating tab bar never covers an action ----- */
+    const problems = await checkTabBar(page, db);
+    if (problems.length) {
+      console.error("\ntab bar overlaps:\n" + problems.join("\n"));
+      process.exitCode = 1;
+    } else console.log("\ntab bar check: no action covered on any checked page");
 
     for (const [, api] of others) await api.dispose();
     await browser.close();
