@@ -729,6 +729,7 @@ const en = {
   "graph.member.approvedBy": "Approved by {who}",
   "graph.member.claimOnly": "Not approved yet",
   "graph.member.signed": "{n} signed updates",
+  "import.signNext": "Add them to your portable graph",
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -1456,6 +1457,7 @@ const es: Record<MessageKey, string> = {
   "graph.member.approvedBy": "Aprobado por {who}",
   "graph.member.claimOnly": "Aún sin aprobar",
   "graph.member.signed": "{n} actualizaciones firmadas",
+  "import.signNext": "Agrégalos a tu grafo portátil",
 };
 
 export const MESSAGES: Record<Locale, Record<MessageKey, string>> = { en, es };

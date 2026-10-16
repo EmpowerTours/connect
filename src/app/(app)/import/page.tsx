@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Check, FileUp, Hash, ShieldCheck, Sparkles, UserPlus, Wallet, X as XIcon } from "lucide-react";
+import { Check, ChevronRight, FileUp, Hash, ShieldCheck, Sparkles, UserPlus, Wallet, X as XIcon } from "lucide-react";
 import { dismissSuggestionsAction, followSuggestionsAction, importFarcasterAction, importWalletAction, importXAction } from "@/app/import-actions";
 import { UserAvatar } from "@/components/avatar";
 import { Columns, PageHeader } from "@/components/layout";
@@ -90,10 +90,17 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
         <p className="px-1 text-[14.5px] leading-relaxed text-muted">{t(locale, "import.intro")}</p>
 
         {(sp.followed || sp.dismissed) && (
-          <p className="flex items-center gap-2 rounded-2xl bg-accent-soft px-4 py-3 text-[14px] font-medium text-accent-ink">
-            <Check size={16} />
-            {sp.followed ? t(locale, "import.followedN").replace("{n}", sp.followed) : t(locale, "import.dismissedN").replace("{n}", sp.dismissed ?? "0")}
-          </p>
+          <div className="rounded-2xl bg-accent-soft px-4 py-3 text-[14px] font-medium text-accent-ink" data-testid="import-done">
+            <p className="flex items-center gap-2">
+              <Check size={16} />
+              {sp.followed ? t(locale, "import.followedN").replace("{n}", sp.followed) : t(locale, "import.dismissedN").replace("{n}", sp.dismissed ?? "0")}
+            </p>
+            {sp.followed && (
+              <Link href="/sync" className="mt-1.5 inline-flex items-center gap-1 pl-6 text-[13px] font-semibold underline-offset-2 hover:underline">
+                {t(locale, "import.signNext")} <ChevronRight size={14} />
+              </Link>
+            )}
+          </div>
         )}
 
         {/* Farcaster */}
@@ -136,10 +143,10 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
             </div>
           </div>
           <form action={importXAction} className="mt-3 space-y-2">
-            <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-lilac bg-white/60 px-3.5 py-3 text-[13.5px] text-muted transition hover:bg-white">
+            <label className="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-dashed border-lilac bg-white/60 px-3.5 py-3 text-[13.5px] text-muted transition hover:bg-white">
               <FileUp size={18} className="shrink-0 text-accent" />
               <span className="min-w-0 flex-1">{t(locale, "import.x.pick")}</span>
-              <input type="file" name="files" multiple accept=".js,.csv,.txt,text/csv,text/plain,application/javascript" className="max-w-[46%] text-[12px] file:mr-2 file:rounded-full file:border-0 file:bg-accent-soft file:px-3 file:py-1 file:text-[12px] file:font-semibold file:text-accent-ink" />
+              <input type="file" name="files" multiple accept=".js,.csv,.txt,text/csv,text/plain,application/javascript" className="w-full min-w-0 text-[12px] file:mr-2 file:rounded-full file:border-0 file:bg-accent-soft file:px-3 file:py-1 file:text-[12px] file:font-semibold file:text-accent-ink" />
             </label>
             <div className="flex items-center justify-between gap-3">
               <p className="text-[12px] text-faint">{t(locale, "import.x.hint")}</p>

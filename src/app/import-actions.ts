@@ -197,7 +197,8 @@ export async function followSuggestionsAction(fd: FormData) {
     await prisma.importSuggestion.update({ where: { id: s.id }, data: { status: "followed" } });
   }
   revalidatePath("/", "layout");
-  redirect(`/import?followed=${picked.length}#suggestions`);
+  // No anchor: the confirmation banner sits at the top of the page.
+  redirect(`/import?followed=${picked.length}`);
 }
 
 export async function dismissSuggestionsAction(fd: FormData) {
@@ -205,5 +206,5 @@ export async function dismissSuggestionsAction(fd: FormData) {
   const ids = fd.getAll("ids").map(String).slice(0, 500);
   const r = await prisma.importSuggestion.updateMany({ where: { id: { in: ids }, userId: user.id, status: "pending" }, data: { status: "dismissed" } });
   revalidatePath("/import");
-  redirect(`/import?dismissed=${r.count}#suggestions`);
+  redirect(`/import?dismissed=${r.count}`);
 }
