@@ -730,6 +730,15 @@ const en = {
   "graph.member.claimOnly": "Not approved yet",
   "graph.member.signed": "{n} signed updates",
   "import.signNext": "Add them to your portable graph",
+  "rateLimit.tooMany": "You're going a little fast.",
+  "rateLimit.tryIn": "Try again in {n} minutes.",
+  "rateLimit.tryInOne": "Try again in a minute.",
+  "rateLimit.generic": "You're going a little fast. Please wait a few minutes and try again.",
+  "import.error.rate_limited": "That's a lot of imports in a short time. Please wait a bit and try again.",
+  "onb.err.photo_rate_limited": "Too many photo uploads for now. Please try again later.",
+  "opps.introErr.rate_limited": "You've sent a lot of intro requests. Please wait a bit before sending more.",
+  "opps.reportErr.rate_limited": "You've sent a lot of reports. Please try again later.",
+  "composer.rateLimited": "You're posting a lot right now. Please wait a minute and try again.",
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -1458,6 +1467,15 @@ const es: Record<MessageKey, string> = {
   "graph.member.claimOnly": "Aún sin aprobar",
   "graph.member.signed": "{n} actualizaciones firmadas",
   "import.signNext": "Agrégalos a tu grafo portátil",
+  "rateLimit.tooMany": "Vas un poco rápido.",
+  "rateLimit.tryIn": "Inténtalo de nuevo en {n} minutos.",
+  "rateLimit.tryInOne": "Inténtalo de nuevo en un minuto.",
+  "rateLimit.generic": "Vas un poco rápido. Espera unos minutos e inténtalo de nuevo.",
+  "import.error.rate_limited": "Son muchas importaciones en poco tiempo. Espera un poco e inténtalo de nuevo.",
+  "onb.err.photo_rate_limited": "Demasiadas fotos subidas por ahora. Inténtalo más tarde.",
+  "opps.introErr.rate_limited": "Enviaste muchas solicitudes de presentación. Espera un poco antes de enviar más.",
+  "opps.reportErr.rate_limited": "Enviaste muchos reportes. Inténtalo más tarde.",
+  "composer.rateLimited": "Estás publicando mucho ahora. Espera un minuto e inténtalo de nuevo.",
 };
 
 export const MESSAGES: Record<Locale, Record<MessageKey, string>> = { en, es };

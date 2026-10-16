@@ -56,7 +56,7 @@ function RunSummary({ run, locale }: { run: { found: number; matched: number; cr
 function ErrorNote({ code, locale }: { code?: string; locale: Locale }) {
   if (!code) return null;
   const key = `import.error.${code}` as MessageKey;
-  const known = ["username", "need_wallet", "not_found", "not_found_wallet", "unavailable", "empty", "too_large", "unreadable"].includes(code);
+  const known = ["username", "need_wallet", "not_found", "not_found_wallet", "unavailable", "empty", "too_large", "unreadable", "rate_limited"].includes(code);
   return <p role="alert" className="mt-3 rounded-xl bg-danger/10 px-3 py-2 text-[13px] text-danger">{t(locale, known ? key : "import.error.unavailable")}</p>;
 }
 

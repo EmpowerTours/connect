@@ -25,8 +25,8 @@ import { INTRO_REASON_MAX, REPORT_REASONS, displayState } from "@/lib/opportunit
 
 export const dynamic = "force-dynamic";
 
-const INTRO_ERRORS = ["self", "not_live", "connected", "duplicate", "reason_empty", "reason_long"] as const;
-const REPORT_ERRORS = ["self", "reason", "note_long"] as const;
+const INTRO_ERRORS = ["self", "not_live", "connected", "duplicate", "reason_empty", "reason_long", "rate_limited"] as const;
+const REPORT_ERRORS = ["self", "reason", "note_long", "rate_limited"] as const;
 const pick = <T extends string>(list: readonly T[], v?: string): T | null => (v && (list as readonly string[]).includes(v) ? (v as T) : null);
 
 export default async function OpportunityPage({

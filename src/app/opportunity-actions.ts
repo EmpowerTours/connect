@@ -1,5 +1,6 @@
 "use server";
 
+import { limitMember } from "@/lib/rate-limit-server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
@@ -94,6 +95,7 @@ export async function setOpportunityStatusAction(fd: FormData) {
 export async function requestDirectIntroAction(fd: FormData) {
   const user = await requireUser();
   const opp = await prisma.opportunity.findUniqueOrThrow({ where: { id: str(fd, "opportunityId") } });
+  if (!(await limitMember(user.id, "intro", "introDaily")).ok) redirect(`/opportunities/${opp.id}?introError=rate_limited#intro`);
   const reason = str(fd, "reason");
   const [edges, existing] = await Promise.all([
     prisma.followUser.findMany({
@@ -123,6 +125,7 @@ export async function requestDirectIntroAction(fd: FormData) {
 export async function reportOpportunityAction(fd: FormData) {
   const user = await requireUser();
   const opp = await prisma.opportunity.findUniqueOrThrow({ where: { id: str(fd, "id") } });
+  if (!(await limitMember(user.id, "report")).ok) redirect(`/opportunities/${opp.id}?reportError=rate_limited#report`);
   const r = validateReport({ reporterId: user.id, authorId: opp.authorId, reason: str(fd, "reason"), note: str(fd, "note") });
   if (!r.ok) redirect(`/opportunities/${opp.id}?reportError=${r.error}#report`);
   const key = { reporterId_targetType_targetId: { reporterId: user.id, targetType: "opportunity", targetId: opp.id } };

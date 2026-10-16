@@ -1,5 +1,6 @@
 "use server";
 
+import { limitMember } from "@/lib/rate-limit-server";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -316,6 +317,7 @@ export async function generateScoutAction(fd: FormData) {
 
 export async function createPostAction(fd: FormData): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const user = await requireUser();
+  if (!(await limitMember(user.id, "post", "postDaily")).ok) return { ok: false, error: "rate_limited" };
   const v = validatePostBody(String(fd.get("body") ?? ""));
   if (!v.ok) return { ok: false, error: v.error };
   const body = v.body;
@@ -386,6 +388,7 @@ export async function draftIntroAction(fd: FormData) {
   const reason = str(fd, "reason").slice(0, 300);
   const locale = str(fd, "locale") === "es" ? "es" : "en";
   const back = `/u/${target.handle}?intro=1`;
+  if (!(await limitMember(user.id, "intro", "introDaily")).ok) redirect(`${back}&error=rate_limited`);
   const edges = await prisma.followUser.findMany({ select: { followerId: true, followeeId: true } });
   const open = await prisma.intro.findMany({ where: { requesterId: user.id, targetId: target.id }, select: { requesterId: true, targetId: true, status: true } });
   const err = validateIntroRequest({ requesterId: user.id, connectorId, targetId: target.id }, edges, open);

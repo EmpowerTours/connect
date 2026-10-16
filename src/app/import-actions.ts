@@ -1,5 +1,6 @@
 "use server";
 
+import { limitMember } from "@/lib/rate-limit-server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
@@ -48,6 +49,7 @@ function done(source: ImportSource, extra = ""): never {
 
 export async function importFarcasterAction(fd: FormData) {
   const user = await requireUser();
+  if (!(await limitMember(user.id, "import")).ok) redirect("/import?fcError=rate_limited#farcaster");
   const wallet = user.walletVerified && user.walletAddress ? user.walletAddress : null;
   const raw = str(fd, "username");
   const username = raw ? normalizeFarcasterUsername(raw) : null;
@@ -87,6 +89,7 @@ export async function importFarcasterAction(fd: FormData) {
 
 export async function importXAction(fd: FormData) {
   const user = await requireUser();
+  if (!(await limitMember(user.id, "import")).ok) redirect("/import?xError=rate_limited#x");
   const files = fd.getAll("files").filter((f): f is File => typeof f === "object" && f !== null && "arrayBuffer" in f && (f as File).size > 0);
   if (!files.length) redirect("/import?xError=empty#x");
   if (files.length > 4 || files.some((f) => f.size > MAX_X_FILE_BYTES)) redirect("/import?xError=too_large#x");
@@ -120,6 +123,7 @@ export async function importXAction(fd: FormData) {
 
 export async function importWalletAction() {
   const user = await requireUser();
+  if (!(await limitMember(user.id, "import")).ok) redirect("/import?walletError=rate_limited#wallet");
   if (!user.walletVerified || !user.walletAddress) redirect("/import?walletError=need_wallet#wallet");
   const rpc = httpRpc();
   const mine = await packsHeldBy(rpc, user.walletAddress);

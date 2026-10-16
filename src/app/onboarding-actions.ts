@@ -1,5 +1,6 @@
 "use server";
 
+import { limitMember } from "@/lib/rate-limit-server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
@@ -87,6 +88,7 @@ export async function saveProfileExtrasAction(fd: FormData) {
   if (!links.ok) fail(`link_${links.error}`);
   const photo = fd.get("photo");
   if (photo instanceof File && photo.size > 0) {
+    if (!(await limitMember(user.id, "upload")).ok) fail("photo_rate_limited");
     const err = await storeAvatar(user.id, user.avatarKey, photo);
     if (err) fail(`photo_${err}`);
   }

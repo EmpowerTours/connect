@@ -62,7 +62,7 @@ export function Composer({ locale, channels, parentId, quoteOfId, defaultChannel
     start(async () => {
       const res = await createPostAction(fd);
       if (!res.ok) {
-        setError(res.error === "too_long" ? t(locale, "composer.tooLong") : t(locale, "composer.empty"));
+        setError(t(locale, res.error === "too_long" ? "composer.tooLong" : res.error === "rate_limited" ? "composer.rateLimited" : "composer.empty"));
         return;
       }
       setBody("");

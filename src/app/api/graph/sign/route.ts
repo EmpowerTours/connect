@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
 import { acceptSigned } from "@/lib/graph/server";
 import { GRAPH_ACTIONS } from "@/lib/graph/typed-data";
+import { limitMember, tooManyResponse } from "@/lib/rate-limit-server";
 import { readJson } from "../../auth/respond";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +32,8 @@ const Body = z.object({
 export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "sign in first" }, { status: 401 });
+  const rl = await limitMember(user.id, "graphSign");
+  if (!rl.ok) return tooManyResponse(rl);
   const parsed = Body.safeParse(await readJson(req));
   if (!parsed.success) return NextResponse.json({ error: "invalid payload" }, { status: 400 });
   const r = await acceptSigned(user, parsed.data.items);

@@ -131,7 +131,7 @@ export const ONBOARDING_ERRORS = [
   "org_name_empty", "org_name_long", "org_website", "org_type", "org_exists",
   "region", "tags_empty", "tags_many", "tag",
   "link_x", "link_linkedin", "link_website",
-  "photo_empty", "photo_too_large", "photo_type", "photo_dimensions", "photo_corrupt",
+  "photo_empty", "photo_too_large", "photo_type", "photo_dimensions", "photo_corrupt", "photo_rate_limited",
 ] as const;
 export type OnboardingError = (typeof ONBOARDING_ERRORS)[number];
 export function isOnboardingError(v: string | undefined): v is OnboardingError {

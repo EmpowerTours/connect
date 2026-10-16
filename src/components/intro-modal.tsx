@@ -61,7 +61,7 @@ export async function IntroModal({
           </p>
           <p className="text-center text-sm text-faint">{[target.headline, target.orgName].filter(Boolean).join(" @ ")}</p>
 
-          {error && <p className="mt-4 rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
+          {error && <p className="mt-4 rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">{error === "rate_limited" ? t(locale, "opps.introErr.rate_limited") : error}</p>}
 
           {!draft ? (
             mutual.length === 0 ? (
