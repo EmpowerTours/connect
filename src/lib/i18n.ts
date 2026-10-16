@@ -620,6 +620,19 @@ const en = {
   "today.aboutYourAsk": "wants to connect about your ask",
   "today.aboutYourOffer": "wants to connect about your offer",
   "admin.role": "Role",
+  "feed.picker": "Feed",
+  "feed.channelDefault": "default",
+  "feed.muting": "Muting:",
+  "feed.tune": "Tune",
+  "feed.muteTopics": "Mute topics",
+  "feed.muteChannels": "Mute channels",
+  "feed.muteHint": "Muted posts are hidden from every feed. Your own posts always show.",
+  "feed.saveMutes": "Save",
+  "feed.emptyTitle": "Nothing in this feed yet",
+  "feed.emptyBody": "This feed is filtering everything out right now. Try another feed or unmute a topic.",
+  "feed.setDefault": "Set as channel default",
+  "feed.adminDefault": "Admin: what this channel rewards by default",
+  "feed.defaultSaved": "Channel default",
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -1238,6 +1251,19 @@ const es: Record<MessageKey, string> = {
   "today.aboutYourAsk": "quiere conectar por tu pedido",
   "today.aboutYourOffer": "quiere conectar por tu oferta",
   "admin.role": "Cargo",
+  "feed.picker": "Feed",
+  "feed.channelDefault": "predeterminado",
+  "feed.muting": "Silenciando:",
+  "feed.tune": "Ajustar",
+  "feed.muteTopics": "Silenciar temas",
+  "feed.muteChannels": "Silenciar canales",
+  "feed.muteHint": "Las publicaciones silenciadas se ocultan en todos los feeds. Las tuyas siempre se ven.",
+  "feed.saveMutes": "Guardar",
+  "feed.emptyTitle": "Aún no hay nada en este feed",
+  "feed.emptyBody": "Este feed está filtrando todo por ahora. Prueba otro feed o deja de silenciar un tema.",
+  "feed.setDefault": "Usar como predeterminado del canal",
+  "feed.adminDefault": "Admin: lo que este canal premia por defecto",
+  "feed.defaultSaved": "Predeterminado del canal",
 };
 
 export const MESSAGES: Record<Locale, Record<MessageKey, string>> = { en, es };

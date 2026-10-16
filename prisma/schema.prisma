@@ -53,6 +53,12 @@ model User {
   linkX               String        @default("")
   linkLinkedin        String        @default("")
   linkWebsite         String        @default("")
+  /// Feed algorithm id (src/lib/feed-algorithms.ts); "" = the default.
+  feedAlgorithm       String        @default("")
+  /// JSON list of FOCUS_TAGS muted in every feed.
+  mutedTopics         String        @default("[]")
+  /// JSON list of channel slugs muted in every feed.
+  mutedChannels       String        @default("[]")
   createdAt           DateTime      @default(now())
 
   likes            Like[]
@@ -347,6 +353,8 @@ model Channel {
   slug        String          @unique
   name        String
   description String          @default("")
+  /// The channel's default feed algorithm ("" = latest). Set by admins.
+  defaultFeed String          @default("")
   createdAt   DateTime        @default(now())
   members     ChannelMember[]
   posts       Post[]

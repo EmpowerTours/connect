@@ -1,14 +1,17 @@
-import { Sparkles, Users } from "lucide-react";
+import { Filter, Sparkles, Users } from "lucide-react";
 import Link from "next/link";
 import type { PostCtx } from "@/components/post-card";
 import { UserAvatar } from "@/components/avatar";
 import { avatarUrl } from "@/lib/media";
 import { Composer } from "@/components/composer";
 import { EmptyState } from "@/components/empty-state";
+import { FeedPicker } from "@/components/feed-picker";
 import { Columns, PageHeader, Tabs } from "@/components/layout";
 import { PostCard } from "@/components/post-card";
 import { getLocale, requireUser } from "@/lib/auth";
-import { getHomeFeed } from "@/lib/feed";
+import { prisma } from "@/lib/db";
+import { getProgrammableFeed, viewerMutes, type FeedViewer } from "@/lib/feed";
+import { DEFAULT_FEED_ALGORITHM, resolveFeedAlgorithm, type FeedAlgorithm } from "@/lib/feed-algorithms";
 import { t } from "@/lib/i18n";
 import { getPostCtx } from "@/lib/post-ctx";
 
@@ -19,6 +22,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const locale = await getLocale();
   const tab = (await searchParams).tab === "all" ? "all" : "following";
   const ctx = await getPostCtx(user, locale);
+  const algorithm = resolveFeedAlgorithm({ saved: user.feedAlgorithm });
+  const mutes = viewerMutes(user);
+  const channels = await prisma.channel.findMany({ select: { slug: true, name: true }, orderBy: { slug: "asc" } });
+  const back = tab === "all" ? "/updates?tab=all" : "/updates";
 
   return (
     <Columns>
@@ -30,18 +37,29 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           ]}
         />
       </PageHeader>
+      <FeedPicker
+        locale={locale}
+        active={algorithm}
+        mode={{ kind: "save", back }}
+        mutes={{ topics: [...mutes.topics], channels: [...mutes.channels] }}
+        channels={channels}
+      />
       <div className="border-b border-line" id="compose">
         <Composer locale={locale} channels={ctx.channels} author={<UserAvatar name={user.name} seed={user.handle} src={avatarUrl(user.avatarKey)} size={42} />} />
       </div>
       {/* Rendered inline (no Suspense/loading.tsx): in Next 15.5 streamed boundaries here stopped server-action refreshes from applying. */}
-      {await HomeFeed({ viewerId: user.id, tab, ctx })}
+      {await HomeFeed({ viewer: user, tab, ctx, algorithm })}
     </Columns>
   );
 }
 
-async function HomeFeed({ viewerId, tab, ctx }: { viewerId: string; tab: "following" | "all"; ctx: PostCtx }) {
-  const items = await getHomeFeed(viewerId, tab);
+async function HomeFeed({ viewer, tab, ctx, algorithm }: { viewer: FeedViewer; tab: "following" | "all"; ctx: PostCtx; algorithm: FeedAlgorithm }) {
+  const items = await getProgrammableFeed(viewer, { pool: tab, algorithm });
   const locale = ctx.locale;
+  const filtered = algorithm.id !== DEFAULT_FEED_ALGORITHM || viewer.mutedTopics !== "[]" || viewer.mutedChannels !== "[]";
+  if (items.length === 0 && filtered) {
+    return <EmptyState icon={Filter} title={t(locale, "feed.emptyTitle")} body={t(locale, "feed.emptyBody")} />;
+  }
   if (items.length === 0) {
     return (
       <EmptyState
