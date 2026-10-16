@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p .railway",
     "test": "vitest run",
     "db:start": "tsx scripts/db-start.ts",
     "db:migrate": "prisma migrate dev",
@@ -23,7 +23,8 @@
     "screenshots:real": "tsx scripts/screenshots-real.ts",
     "screenshots:graph": "tsx scripts/screenshots-graph.ts",
     "logos": "tsx scripts/fetch-logos.ts",
-    "graph:verify": "tsx scripts/verify-graph.ts"
+    "graph:verify": "tsx scripts/verify-graph.ts",
+    "start:prod": "node scripts/start.mjs"
   },
   "dependencies": {
     "@category-labs/mera": "^0.2.0",
@@ -54,6 +55,7 @@
     "eslint": "^9",
     "eslint-config-next": "15.5.28",
     "playwright-core": "^1.64.1",
+    "railway": "3.16.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5",

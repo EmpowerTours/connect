@@ -1,0 +1,13 @@
+# Never send local state, secrets or build output into the image context.
+node_modules
+.next
+.data
+.git
+.env*
+!.env.example
+prisma/*.db
+prisma/*.db-journal
+screenshots-tmp
+coverage
+*.tsbuildinfo
+npm-debug.log*
