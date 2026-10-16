@@ -10,6 +10,7 @@
  * lock everyone out. Replay protection (nonces) fails closed separately.
  */
 import { Redis } from "@upstash/redis";
+import { BRAND } from "./brand";
 
 export interface LimitRule {
   limit: number;
@@ -108,7 +109,8 @@ export async function checkLimit(
   const retryAfter = Math.max(1, Math.ceil(((window + 1) * windowMs - now) / 1000));
   let count: number;
   try {
-    count = await store.hit(`rl:${name}:${subject}:${window}`, rule.windowSeconds);
+    // Namespaced so Connect can share one Upstash database with other EmpowerTours apps.
+    count = await store.hit(`${BRAND.subdomain}:rl:${name}:${subject}:${window}`, rule.windowSeconds);
   } catch (e) {
     console.error(`[rate-limit] ${name} store failed; allowing`, e);
     return { ok: true, limit: rule.limit, remaining: rule.limit, retryAfter: 0 };

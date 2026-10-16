@@ -123,3 +123,13 @@ describe("wiring", () => {
     }
   });
 });
+
+describe("rate limit keys", () => {
+  it("are namespaced to Connect so one Upstash database can be shared with other EmpowerTours apps", async () => {
+    const keys: string[] = [];
+    const store: RateLimitStore = { hit: async (key) => (keys.push(key), 1) };
+    await checkLimit(store, "post", "user-1", Date.UTC(2026, 9, 16));
+    expect(keys).toHaveLength(1);
+    expect(keys[0]).toMatch(/^connect:rl:post:user-1:\d+$/);
+  });
+});
