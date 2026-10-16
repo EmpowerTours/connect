@@ -343,7 +343,8 @@ describe("auth flows", () => {
 describe("write actions require a session", () => {
   const src = readFileSync(new URL("../src/app/actions.ts", import.meta.url), "utf8");
   const PUBLIC = new Set(["devLoginAction", "logoutAction", "setLocaleAction"]);
-  const GUARDS = /requireUser\(\)|ownedDeal\(|transitionIntro\(|moveDealAction\(/;
+  // requireAdmin() is stricter than requireUser(): it redirects without a session, then 404s non-admins.
+  const GUARDS = /requireUser\(\)|requireAdmin\(\)|ownedDeal\(|transitionIntro\(|moveDealAction\(/;
 
   it("every exported server action (except login/logout/locale) checks the session first", () => {
     const parts = src.split(/\nexport async function /).slice(1);
