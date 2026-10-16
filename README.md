@@ -22,7 +22,7 @@ npm run logos          # optional: fetch org favicons into public/logos (already
 npm run ingest         # optional: pull public RSS news and tag it to orgs
 npm run dev            # http://localhost:3000 → "Continue as demo user" (local demo, no wallet)
 ```
-Other scripts: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, `npm run db:reset`, `npm run screenshots` (demo data; needs a running server + Chrome; see `scripts/screenshots.ts`), `npm run screenshots:real` (a brand-new member on a base-seed + real-news database; starts its own server; see `scripts/screenshots-real.ts`).
+Other scripts: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, `npm run db:reset`, `npm run screenshots` (demo data; needs a running server + Chrome; see `scripts/screenshots.ts`), `npm run screenshots:real` (a brand-new member on a base-seed + real-news database; starts its own server; see `scripts/screenshots-real.ts`), `npm run screenshots:graph` (feeds, importers and the signed graph on a fresh preview database with a local mock hub/RPC; starts its own server; see `scripts/screenshots-graph.ts`), `npm run graph:verify` (see below).
 
 The default seed (`db:seed`, `setup`, `db:reset`) creates **no people and no content**: only the 53 public-fact organizations, the public news feeds and topic channels. Fictional demo people are only added by `npm run seed:demo`, which refuses to run with `NODE_ENV=production`.
 
@@ -99,6 +99,27 @@ Config for real Mera sign-in (see `.env.example`): `AUTH_SESSION_SECRET` (≥ 32
 
 ## Organizations: claims and admin review
 A passkey-verified member can **claim membership** of an organization (role, optional evidence link, note) from the org's People tab, or **request a new organization** that isn't listed. Claims stay **pending** until an admin approves them; only approved claims count as **verified members** on org pages. Admins are the wallets listed in `ADMIN_WALLETS`, signed in with a Mera passkey (the local demo login is never an admin); `/admin` is a 404 for everyone else. Org pages state that listing is based on public information and does not imply the organization endorses Connect.
+
+## Programmable feed
+Updates and channel feeds rank through small `FeedAlgorithm` plugins (`src/lib/feed-algorithms.ts`: an id, EN/ES label and description, and a pure `score()` that can drop a post). Built in: **Latest**, **High-signal** (approved organization members only), **Conversations** (replies weigh most) and **No bait** (likes and reposts without replies count against a post). Register another with `registerFeedAlgorithm()`. Members pick a feed from the chips above the feed (saved to their profile) and use **Tune** to mute focus topics and channels; their own posts are never muted. Admins can give a channel a default feed; members can still switch with `?feed=`.
+
+## Cold-start importers (`/import`)
+Everything found becomes a **suggestion**; nothing is followed until the member ticks and confirms.
+- **Farcaster:** reads who you follow from a Farcaster hub (`FARCASTER_HUB_URL`, default the free public hub `https://haatz.quilibrium.com`; or Neynar when `NEYNAR_API_KEY` is set). Lookup by username, or by your Mera wallet when it is the account's custody address (hubs cannot search verified addresses; Neynar can). Only members whose Connect wallet is verified on their Farcaster account are matched. If the hub is unreachable the card says so; nothing else breaks.
+- **X:** upload `following.js` (plus `account.js`) from the X data export, or a CSV of handles. Nothing is sent to X. Matching uses the X link members put on their profile, so it is self-declared and labelled that way.
+- **Wallet starter packs:** read-only `eth_call` balance checks on Monad (chain 143, `MONAD_RPC_URL`, default `https://rpc.monad.xyz`) for the EmpowerTours Passport (Hunt), TURBO cohort and TOURS token contracts. Only `eth_call`, `eth_chainId` and `eth_blockNumber` are allowed; results are cached for a day.
+
+## Signed portable graph (`/sync`, `/graph`)
+Follows and unfollows, approved organization memberships, admin approvals and revocations, and accepted intros become **EIP-712 `GraphUpdate` messages** signed by the member's Mera passkey wallet (domain `EmpowerToursConnect`, version 1, chain 143). They are signed messages only: no transaction, no gas, no contract. `/sync` shows what is waiting for a signature (the difference between your Connect state and your signed log) and signs it in one passkey prompt. Each wallet's updates carry a consecutive `seq`; admin actions are only valid from `ADMIN_WALLETS`.
+
+The log is public and read-only: `GET /api/graph/events?cursor=&limit=&author=` (paginated, CORS) and `GET /api/graph/users/{handle|wallet}`; `/graph` and `/graph/{handle}` show it with every signature re-checked. Anyone can verify it without trusting the server:
+
+```bash
+npm run graph:verify -- --base https://your-connect-host [--user valeria] [--admins 0x..] [--save graph.json]
+npm run graph:verify -- --file graph.json
+```
+
+The script uses this repo's own domain and types, checks every signature, sequence gaps and duplicates, and admin authority, rebuilds the graph and exits non-zero on any failure. After pulling these changes run `npm run db:push` to add the new tables and columns.
 
 ## Onboarding and profile photos
 After a first Mera passkey sign-in, members go through a five-step welcome flow at `/welcome` (name + headline, organization, region + focus tags, photo + links, first ask/offer) before they reach the app; the local demo user skips it. Picking a listed organization can also file a pending claim (wallet-verified members only); an unlisted one becomes an org request for admin review. Region, focus tags, photo and links stay editable on `/profile`.

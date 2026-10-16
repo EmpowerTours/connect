@@ -18,6 +18,7 @@
     "postinstall": "prisma generate",
     "screenshots": "tsx scripts/screenshots.ts",
     "screenshots:real": "tsx scripts/screenshots-real.ts",
+    "screenshots:graph": "tsx scripts/screenshots-graph.ts",
     "logos": "tsx scripts/fetch-logos.ts",
     "graph:verify": "tsx scripts/verify-graph.ts"
   },
