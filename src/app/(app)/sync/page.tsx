@@ -55,7 +55,7 @@ export default async function SyncPage() {
               </Link>
             </section>
 
-            <section className="glass overflow-hidden p-1.5" data-testid="graph-pending">
+            <section className="glass overflow-clip p-1.5" data-testid="graph-pending">
               <div className="flex items-baseline justify-between px-3 pb-1 pt-2.5">
                 <h2 className="text-[16px] font-semibold tracking-tight">{t(locale, "graph.mine.pending")}</h2>
                 <span className="text-[13px] font-semibold text-accent-ink">{ops.length}</span>
@@ -78,7 +78,7 @@ export default async function SyncPage() {
                   {t(locale, "graph.mine.skipped").replace("{n}", String(pending!.skipped.follows + pending!.skipped.intros))}
                 </p>
               )}
-              <div className="p-2">
+              <div className="sticky-actions rounded-b-[26px] p-2" data-testid="graph-sign">
                 <GraphSignButton
                   count={ops.length}
                   label={ops.length ? t(locale, "graph.mine.sign").replace("{n}", String(ops.length)) : t(locale, "graph.mine.nothing")}

@@ -204,7 +204,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
               <p className="mx-auto mt-1 max-w-sm text-[13.5px] text-muted">{t(locale, sp.ran ? "import.noneAfterRun" : "import.noneBody")}</p>
             </div>
           ) : (
-            <form action={followSuggestionsAction} className="glass overflow-hidden p-1.5">
+            <form action={followSuggestionsAction} className="glass overflow-clip p-1.5">
               <p className="px-3 pb-1 pt-2 text-[12.5px] text-faint">{t(locale, "import.confirmHint")}</p>
               <ul className="divide-y divide-line/70">
                 {people.map((s) => {
@@ -250,7 +250,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
                   </li>
                 ))}
               </ul>
-              <div className="flex gap-2 border-t border-line/70 p-2.5">
+              <div className="sticky-actions -mx-1.5 -mb-1.5 flex gap-2 rounded-b-[26px] border-t border-line/70 p-2.5 px-4" data-testid="import-actions">
                 <button className="btn-primary h-11 flex-1"><UserPlus size={16} /> {t(locale, "import.followSelected")}</button>
                 <button formAction={dismissSuggestionsAction} className="btn-secondary h-11"><XIcon size={16} /> {t(locale, "import.dismiss")}</button>
               </div>

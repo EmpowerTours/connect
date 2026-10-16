@@ -37,6 +37,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           ]}
         />
       </PageHeader>
+      <div className="border-b border-line" id="compose">
+        <Composer locale={locale} channels={ctx.channels} author={<UserAvatar name={user.name} seed={user.handle} src={avatarUrl(user.avatarKey)} size={42} />} />
+      </div>
       <FeedPicker
         locale={locale}
         active={algorithm}
@@ -44,9 +47,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         mutes={{ topics: [...mutes.topics], channels: [...mutes.channels] }}
         channels={channels}
       />
-      <div className="border-b border-line" id="compose">
-        <Composer locale={locale} channels={ctx.channels} author={<UserAvatar name={user.name} seed={user.handle} src={avatarUrl(user.avatarKey)} size={42} />} />
-      </div>
       {/* Rendered inline (no Suspense/loading.tsx): in Next 15.5 streamed boundaries here stopped server-action refreshes from applying. */}
       {await HomeFeed({ viewer: user, tab, ctx, algorithm })}
     </Columns>

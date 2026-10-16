@@ -16,7 +16,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <>
       <div className="mx-auto flex max-w-[1200px]">
         <SideRail locale={locale} user={shellUser} pendingIntros={pendingIntros} />
-        <div className="min-w-0 flex-1 pb-28 md:pb-10">{children}</div>
+        <div className="pb-tabbar min-w-0 flex-1 md:pb-10">{children}</div>
       </div>
       <TabBar locale={locale} />
     </>

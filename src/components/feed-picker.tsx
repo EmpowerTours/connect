@@ -100,9 +100,9 @@ export function FeedPicker({
               </div>
             </>
           )}
-          <p className="text-[12px] text-faint">{t(locale, "feed.muteHint")}</p>
-          <div className="flex justify-end">
-            <button className="btn-primary h-9 text-[13px]">{t(locale, "feed.saveMutes")}</button>
+          <div className="sticky-actions -mx-3.5 -mb-3.5 flex items-center gap-3 rounded-b-[20px] px-3.5 py-3" data-testid="feed-mutes-actions">
+            <p className="min-w-0 flex-1 text-[12px] text-faint">{t(locale, "feed.muteHint")}</p>
+            <button className="btn-primary h-9 shrink-0 text-[13px]">{t(locale, "feed.saveMutes")}</button>
           </div>
         </form>
       </details>

@@ -44,7 +44,16 @@
   }
 }
 
-html { color-scheme: light; -webkit-tap-highlight-color: transparent; }
+/*
+ * Room the floating mobile tab bar needs: its 64px height, its offset from the bottom edge
+ * (at least 14px, more on phones with a home indicator) and a little breathing space.
+ * Page bottoms, scroll targets and sticky action bars all use this one value, so actions
+ * are never hidden under the bar. Desktop has no tab bar.
+ */
+:root { --tabbar-clearance: calc(64px + max(14px, env(safe-area-inset-bottom)) + 14px); }
+@media (min-width: 48rem) { :root { --tabbar-clearance: 0px; } }
+
+html { color-scheme: light; -webkit-tap-highlight-color: transparent; scroll-padding-bottom: var(--tabbar-clearance); }
 body {
   background:
     radial-gradient(900px 520px at 85% -120px, rgb(196 181 253 / 0.35), transparent 70%),
@@ -99,6 +108,15 @@ body {
   background-size: 400px 100%;
   background-repeat: no-repeat;
   animation: var(--animate-shimmer);
+}
+/* Action row that stays above the mobile tab bar while its list scrolls (needs no overflow-hidden ancestor). */
+@utility sticky-actions {
+  @apply sticky z-30 bg-white/85 backdrop-blur-xl;
+  bottom: var(--tabbar-clearance);
+}
+/* Bottom spacing for anything that scrolls under the mobile tab bar. */
+@utility pb-tabbar {
+  padding-bottom: calc(var(--tabbar-clearance) + 16px);
 }
 @utility no-scrollbar {
   scrollbar-width: none;
