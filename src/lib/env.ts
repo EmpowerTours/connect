@@ -5,6 +5,8 @@
  */
 import { EMPOWERTOURS_RP_ID } from "./mera/derive";
 import { adminWallets } from "./admin";
+import { parseSentryDsn } from "./error-report";
+import { logger } from "./log";
 import { s3ConfigFromEnv } from "./storage";
 
 export interface EnvReport {
@@ -55,6 +57,7 @@ export function checkProductionEnv(env: Env, built: { rpId?: string } = {}): Env
   need("ALLOW_DEV_LOGIN", !env.ALLOW_DEV_LOGIN, "must not be set in production (it enables the one-click demo login)");
 
   if (env.CRON_SECRET && env.CRON_SECRET.length < 32) warnings.push("CRON_SECRET is shorter than 32 characters, so /api/cron/ingest stays off");
+  if (env.SENTRY_DSN && !parseSentryDsn(env.SENTRY_DSN)) warnings.push("SENTRY_DSN is set but is not a valid DSN (https://<key>@<host>/<project id>): errors are only logged");
   if (env.ANTHROPIC_API_KEY === undefined && env.OPENAI_API_KEY === undefined) warnings.push("no AI provider key: the scout uses its template drafts");
   return { errors, warnings };
 }
@@ -64,9 +67,9 @@ export function assertProductionEnv(env: Env = process.env): void {
   if (env.NODE_ENV !== "production") return;
   // Literal access so Next inlines the value the client bundle was built with.
   const { errors, warnings } = checkProductionEnv(env, { rpId: process.env.NEXT_PUBLIC_RP_ID });
-  for (const w of warnings) console.warn(`[env] ${w}`);
+  for (const w of warnings) logger.warn(`[env] ${w}`, { scope: "env" });
   if (errors.length) {
-    console.error(`[env] Refusing to start: ${errors.length} configuration problem(s):\n${errors.map((e) => `  - ${e}`).join("\n")}`);
+    logger.error(`[env] Refusing to start: ${errors.length} configuration problem(s)`, { scope: "env", problems: errors });
     process.exit(1);
   }
 }

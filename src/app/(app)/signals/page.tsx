@@ -10,6 +10,7 @@ import { after } from "next/server";
 import { getCurrentAuth, getLocale, requireUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
 import { ingestIfStale } from "@/lib/ingest-schedule";
+import { reportError } from "@/lib/error-report";
 import { prisma } from "@/lib/db";
 import { t } from "@/lib/i18n";
 
@@ -20,7 +21,7 @@ export default async function SignalsPage({ searchParams }: { searchParams: Prom
   const locale = await getLocale();
   const scope = (await searchParams).scope;
   const admin = isAdmin(user, (await getCurrentAuth())?.method);
-  after(() => ingestIfStale(prisma).catch((e) => console.error("[ingest]", e)));
+  after(() => ingestIfStale(prisma).catch((e) => reportError("background ingest failed", e, { scope: "ingest" })));
   const followed = (await prisma.followOrg.findMany({ where: { userId: user.id }, select: { orgId: true } })).map((f) => f.orgId);
   const where = scope === "following" ? { orgs: { some: { orgId: { in: followed } } } } : scope === "all" ? {} : { orgs: { some: {} } };
   const [signals, feeds] = await Promise.all([

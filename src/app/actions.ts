@@ -9,6 +9,7 @@ import { devLoginAllowed } from "@/lib/auth-core";
 import { DEMO_EMAIL, LANG_COOKIE, createDemoSession, destroySession, ensureUser, getCurrentUser, getWorkspace, requireAdmin, requireUser } from "@/lib/auth";
 import { ADVISOR_INFLUENCE, ACTIVITY_KINDS, ORG_TYPES, regionForCountry } from "@/lib/constants";
 import { prisma } from "@/lib/db";
+import { reportError } from "@/lib/error-report";
 import { isLocale } from "@/lib/i18n";
 import { ingestAllFeeds } from "@/lib/ingest";
 import { parseList, toList } from "@/lib/json";
@@ -292,7 +293,7 @@ export async function generateScoutAction(fd: FormData) {
       signals: signals.map((s) => ({ title: s.title, url: s.url })),
     });
   } catch (err) {
-    console.error("[scout]", err);
+    await reportError("scout draft failed", err, { scope: "scout", orgId: org.id });
     redirect(`/orgs/${org.slug}?tab=deal&scoutError=1`);
   }
   await prisma.scoutDraft.create({
@@ -411,7 +412,7 @@ export async function draftIntroAction(fd: FormData) {
       sharedTopics,
     });
   } catch (e) {
-    console.error("[intro draft]", e);
+    await reportError("intro draft failed", e, { scope: "intro" });
     redirect(`${back}&error=${encodeURIComponent("AI draft failed — check provider settings.")}`);
   }
   // Replace an existing unsent draft for this target instead of piling up drafts.
