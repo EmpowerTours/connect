@@ -23,3 +23,6 @@ export const APP_HOST = `${BRAND.subdomain}.${BRAND.parentDomain}`;
 export const APP_URL = `https://${APP_HOST}`;
 /** e.g. "EmpowerTours Connect" — what the passkey prompt and signature show. */
 export const APP_FULL_NAME = `${BRAND.ecosystem} ${BRAND.name}`;
+
+/** Public source repository (AGPL; linked from the sign-in page). */
+export const SOURCE_URL = "https://github.com/EmpowerTours/connect";

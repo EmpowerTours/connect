@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
-import { FlaskConical, Fingerprint, Handshake, Hash, KanbanSquare, Lock } from "lucide-react";
+import Link from "next/link";
+import { ChevronRight, FlaskConical, Fingerprint, Handshake, Hash, KanbanSquare, Lock } from "lucide-react";
 import { devLoginAction, setLocaleAction } from "@/app/actions";
 import { MeraSignIn } from "@/components/mera-sign-in";
 import { devLoginAllowed } from "@/lib/auth-core";
 import { getCurrentUser, getLocale } from "@/lib/auth";
-import { APP_FULL_NAME, APP_HOST, APP_NAME, BRAND } from "@/lib/brand";
+import { APP_FULL_NAME, APP_HOST, APP_NAME, BRAND, SOURCE_URL } from "@/lib/brand";
 import { t } from "@/lib/i18n";
 import { safeNextPath } from "@/lib/links";
 
@@ -84,8 +85,15 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           </section>
         )}
 
+        <Link href="/graph" className="mt-4 flex items-center justify-center gap-1.5 text-[13px] font-semibold text-accent hover:underline">
+          {t(locale, "login.explore")} <ChevronRight size={14} />
+        </Link>
+
         <p className="mt-6 text-center text-[11px] text-faint">
-          {APP_HOST} · {BRAND.ecosystem}
+          {APP_HOST} · {BRAND.ecosystem} ·{" "}
+          <a href={SOURCE_URL} target="_blank" rel="noopener noreferrer" className="hover:underline">
+            {t(locale, "login.source")}
+          </a>
         </p>
       </div>
     </main>

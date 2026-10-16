@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { InviteButton } from "@/components/invite-button";
+import { APP_URL } from "@/lib/brand";
 import { ChevronRight, Hash, ShieldCheck, Handshake, KanbanSquare, Landmark, Languages, Lock, LogOut, Newspaper, PenLine, Radio, Share2, UserPlus } from "lucide-react";
 import { logoutAction, setLocaleAction } from "@/app/actions";
 import { UserAvatar } from "@/components/avatar";
@@ -55,6 +57,14 @@ export default async function MorePage() {
         </span>
         <ChevronRight size={18} className="text-faint" />
       </Link>
+
+      <section className="glass mt-4 p-4" data-testid="invite">
+        <p className="text-[15px] font-semibold tracking-tight">{t(locale, "invite.title")}</p>
+        <p className="mt-0.5 text-[13px] leading-snug text-muted">{t(locale, "invite.body")}</p>
+        <div className="mt-3">
+          <InviteButton url={APP_URL} text={t(locale, "invite.text")} label={t(locale, "invite.cta")} copiedLabel={t(locale, "invite.copied")} />
+        </div>
+      </section>
 
       {groups.map((g) => (
         <section key={g.title} className="mt-6">
