@@ -4,10 +4,11 @@ import { devLoginAction, setLocaleAction } from "@/app/actions";
 import { MeraSignIn } from "@/components/mera-sign-in";
 import { devLoginAllowed } from "@/lib/auth-core";
 import { getCurrentUser, getLocale } from "@/lib/auth";
-import { APP_HOST, APP_NAME, BRAND } from "@/lib/brand";
+import { APP_FULL_NAME, APP_HOST, APP_NAME, BRAND } from "@/lib/brand";
 import { t } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
+export const metadata = { title: { absolute: APP_FULL_NAME }, alternates: { canonical: "/login" } };
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   if (await getCurrentUser()) redirect("/");
