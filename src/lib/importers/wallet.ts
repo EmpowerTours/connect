@@ -7,6 +7,8 @@
  * Only `eth_call balanceOf(address)` — no logs, no transactions, no signing.
  * Uses MONAD_RPC_URL or the public https://rpc.monad.xyz. Tests inject a fake RPC.
  */
+import { logger } from "../log";
+
 export const MONAD_CHAIN_ID = 143;
 export const DEFAULT_MONAD_RPC = "https://rpc.monad.xyz";
 
@@ -75,8 +77,10 @@ export function httpRpc(url: string = process.env.MONAD_RPC_URL || DEFAULT_MONAD
         body: JSON.stringify({ jsonrpc: "2.0", id: ++id, method, params }),
         signal: AbortSignal.timeout(10_000),
       });
-    } catch {
-      throw new RpcUnavailable("network");
+    } catch (e) {
+      // Expected with a public RPC; the caller reports "unavailable". Keep the cause for debugging.
+      logger.warn("monad rpc request failed", { scope: "import.wallet", method, err: e instanceof Error ? e.name : "unknown" });
+      throw new RpcUnavailable(e instanceof Error && e.name === "TimeoutError" ? "timeout" : "network");
     }
     if (!res.ok) throw new RpcUnavailable(`http_${res.status}`);
     const body = (await res.json()) as { result?: unknown; error?: { message?: string } };
@@ -106,7 +110,9 @@ export async function packsHeldBy(rpc: RpcCall, owner: string, packs: readonly S
     packs.map(async (p) => {
       try {
         if (await holdsPack(rpc, p, owner)) held.push(p.id);
-      } catch {
+      } catch (e) {
+        // One pack failing must not hide the others; it is listed in `failed` and logged.
+        logger.warn("starter pack check failed", { scope: "import.wallet", pack: p.id, err: e });
         failed.push(p.id);
       }
     }),

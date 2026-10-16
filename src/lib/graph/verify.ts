@@ -51,6 +51,7 @@ export async function verifyGraphEvent(e: SignedGraphEvent): Promise<EventCheck>
   try {
     signer = await recoverTypedDataAddress({ ...graphTypedData(e), signature: e.signature as Hex });
   } catch {
+    // Intentional: an unrecoverable signature is a verdict about the event, not a server fault.
     return { ok: false, digest, reason: "bad_signature" };
   }
   if (signer.toLowerCase() !== e.author.toLowerCase()) return { ok: false, digest, reason: "wrong_signer" };

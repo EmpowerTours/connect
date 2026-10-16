@@ -14,6 +14,7 @@ import { randomBytes } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { AwsClient } from "aws4fetch";
+import { logger } from "./log";
 
 export interface StoredBlob {
   data: Buffer;
@@ -59,7 +60,9 @@ export class LocalDiskStore implements BlobStore {
     if (!isMediaKey(key)) return null;
     try {
       return { data: await readFile(this.pathFor(key)), contentType: TYPES[path.extname(key)] ?? "application/octet-stream" };
-    } catch {
+    } catch (e) {
+      // A missing file is a normal 404. Anything else (permissions, a lost volume) is a real fault.
+      if ((e as NodeJS.ErrnoException).code !== "ENOENT") logger.error("local storage read failed", { scope: "storage", key, err: e });
       return null;
     }
   }

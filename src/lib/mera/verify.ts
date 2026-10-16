@@ -11,6 +11,7 @@
 import { Redis } from "@upstash/redis";
 import { isAddress, isHex, recoverTypedDataAddress, type Hex, type RecoverTypedDataAddressParameters } from "viem";
 import { BRAND } from "../brand";
+import { logger } from "../log";
 import { APP_DOMAIN, REGISTRATION_TYPES, SESSION_STATEMENT, SESSION_TYPES } from "./typed-data";
 
 /** Accepted clock skew, seconds (same as Hunt). */
@@ -155,7 +156,9 @@ async function recoverAndCheck(args: {
   let recovered: string;
   try {
     recovered = await recoverTypedDataAddress(args.typedData);
-  } catch {
+  } catch (e) {
+    // Expected for garbage signatures: a client error, not a server fault.
+    logger.debug("session signature did not recover", { scope: "auth", err: e instanceof Error ? e.name : "unknown" });
     return { ok: false, reason: "bad_signature" };
   }
   const address = recovered.toLowerCase();
@@ -166,13 +169,16 @@ async function recoverAndCheck(args: {
   let store: NonceStore;
   try {
     store = args.opts?.store ?? defaultNonceStore(args.opts?.env);
-  } catch {
+  } catch (e) {
+    logger.error("nonce store not configured", { scope: "auth", err: e });
     return { ok: false, reason: "nonce_store_unavailable" };
   }
   let fresh: boolean;
   try {
     fresh = await store.consume(nonceKey(args.primaryType, address, args.nonce), NONCE_TTL_SECONDS);
-  } catch {
+  } catch (e) {
+    // Sign-in is refused (fail closed) while Upstash is down; this is the line to alert on.
+    logger.error("nonce store unavailable", { scope: "auth", err: e });
     return { ok: false, reason: "nonce_store_unavailable" };
   }
   if (!fresh) return { ok: false, reason: "nonce_replayed" };

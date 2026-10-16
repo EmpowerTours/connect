@@ -5,6 +5,7 @@ export function parseList(value: string | null | undefined): string[] {
     const parsed: unknown = JSON.parse(value);
     return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : [];
   } catch {
+    // Intentional: a corrupt stored list reads as empty rather than breaking the page.
     return [];
   }
 }

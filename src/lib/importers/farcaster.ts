@@ -17,6 +17,8 @@
  * after at least one page, the walk returns what it has (`partial: true`);
  * before the first page it throws FarcasterUnavailable("timeout").
  */
+import { logger } from "../log";
+
 export type Fetcher = (
   url: string,
   init?: { headers?: Record<string, string>; signal?: AbortSignal },
@@ -75,6 +77,14 @@ export function normalizeFarcasterUsername(raw: string): string | null {
   return USERNAME.test(v) ? v : null;
 }
 
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return "invalid-url"; // Intentional: only used to label a log line.
+  }
+}
+
 function isAbort(e: unknown): boolean {
   return e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError");
 }
@@ -92,8 +102,10 @@ async function getJson(fetcher: Fetcher, url: string, headers: Record<string, st
   } catch (e) {
     if (e instanceof FarcasterUnavailable) throw e;
     // Network failures are expected (public hub, flaky network) and reported to the member as
-    // "unavailable"; the reason travels in the message, never the URL (Neynar's key is a header).
-    throw new FarcasterUnavailable(isAbort(e) || signal.aborted ? "timeout" : "network");
+    // "unavailable"; the reason travels in the message. The host is logged, never the full URL.
+    const reason = isAbort(e) || signal.aborted ? "timeout" : "network";
+    logger.warn("farcaster request failed", { scope: "import.farcaster", host: hostOf(url), reason, err: e instanceof Error ? e.name : "unknown" });
+    throw new FarcasterUnavailable(reason);
   }
   if (!body) return null; // some hubs answer "not found" with an empty 200
   try {

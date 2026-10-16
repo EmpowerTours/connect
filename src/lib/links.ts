@@ -16,6 +16,7 @@ export function normalizeWebUrl(raw: string): LinkResult {
   try {
     url = new URL(withScheme);
   } catch {
+    // Intentional: unparseable user input is a validation result, not an error.
     return { ok: false };
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") return { ok: false };
@@ -32,6 +33,7 @@ function hostIs(url: string, hosts: string[]): URL | null {
     const h = u.hostname.toLowerCase().replace(/^(www\.|mobile\.)/, "");
     return hosts.includes(h) ? u : null;
   } catch {
+    // Intentional: not a URL, so not one of these hosts.
     return null;
   }
 }
