@@ -14,7 +14,7 @@ export interface EnvReport {
 
 type Env = Record<string, string | undefined>;
 
-export function checkProductionEnv(env: Env): EnvReport {
+export function checkProductionEnv(env: Env, built: { rpId?: string } = {}): EnvReport {
   const errors: string[] = [];
   const warnings: string[] = [];
   const need = (name: string, ok: boolean, why: string) => {
@@ -31,6 +31,11 @@ export function checkProductionEnv(env: Env): EnvReport {
     env.NEXT_PUBLIC_RP_ID === EMPOWERTOURS_RP_ID,
     `must be exactly "${EMPOWERTOURS_RP_ID}" (shared passkey wallet across EmpowerTours apps); it is baked in at build time, so set it before building`,
   );
+
+  // NEXT_PUBLIC_* values are inlined into the bundle at build time; the runtime value alone is not enough.
+  if ("rpId" in built) {
+    need("NEXT_PUBLIC_RP_ID (build)", built.rpId === EMPOWERTOURS_RP_ID, `this build was made without NEXT_PUBLIC_RP_ID="${EMPOWERTOURS_RP_ID}"; set the variable before the build and redeploy`);
+  }
 
   need("UPSTASH_REDIS_REST_URL", /^https:\/\//.test(env.UPSTASH_REDIS_REST_URL ?? ""), "required: sign-in replay protection and rate limits are shared through Upstash Redis");
   need("UPSTASH_REDIS_REST_TOKEN", !!env.UPSTASH_REDIS_REST_TOKEN, "required with UPSTASH_REDIS_REST_URL");
@@ -57,7 +62,8 @@ export function checkProductionEnv(env: Env): EnvReport {
 /** Called at boot. Exits the process on errors in production. */
 export function assertProductionEnv(env: Env = process.env): void {
   if (env.NODE_ENV !== "production") return;
-  const { errors, warnings } = checkProductionEnv(env);
+  // Literal access so Next inlines the value the client bundle was built with.
+  const { errors, warnings } = checkProductionEnv(env, { rpId: process.env.NEXT_PUBLIC_RP_ID });
   for (const w of warnings) console.warn(`[env] ${w}`);
   if (errors.length) {
     console.error(`[env] Refusing to start: ${errors.length} configuration problem(s):\n${errors.map((e) => `  - ${e}`).join("\n")}`);

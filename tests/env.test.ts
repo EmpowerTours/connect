@@ -43,6 +43,11 @@ describe("checkProductionEnv", () => {
     expect(errorsFor({ ...GOOD, ALLOW_DEV_LOGIN: "1" })).toEqual(["ALLOW_DEV_LOGIN"]);
   });
 
+  it("checks the RP ID the bundle was built with, not only the runtime value", () => {
+    expect(checkProductionEnv(GOOD, { rpId: "empowertours.xyz" }).errors).toEqual([]);
+    expect(checkProductionEnv(GOOD, { rpId: undefined }).errors.map((e) => e.split(":")[0])).toEqual(["NEXT_PUBLIC_RP_ID (build)"]);
+  });
+
   it("never echoes values in messages", () => {
     const secret = "super-secret-value-that-must-not-appear";
     const { errors, warnings } = checkProductionEnv({ ...GOOD, AUTH_SESSION_SECRET: "s", UPSTASH_REDIS_REST_URL: secret, CRON_SECRET: "short" });
