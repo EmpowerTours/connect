@@ -28,4 +28,13 @@ npm run build
 - Never commit secrets, `.env` files or local data (`.data/`). Only `.env.example`, with empty values, belongs in git.
 - Security problems: please do not open a public issue; see [SECURITY.md](SECURITY.md).
 
-By contributing you agree that your contributions are licensed under the [MIT License](LICENSE).
+## Licensing your contribution
+This project is **dual licensed**: AGPL-3.0 for everyone, plus a commercial license EmpowerTours can sell to anyone unwilling to meet AGPL section 13 (see [NOTICE](NOTICE)). That only works while EmpowerTours holds copyright in the whole work.
+
+So **by submitting a contribution you agree that**:
+
+1. Your contribution is published under AGPL-3.0, like everything else.
+2. You grant EmpowerTours S.A.S. de C.V. a perpetual, worldwide, non-exclusive, royalty-free right to license your contribution under other terms, including commercial ones.
+3. You keep your copyright. You are not assigning it to us. Your name stays on the commit and the work stays yours.
+
+If that does not sit right with you, say so before sending code and we will talk about it. It is far better to settle it beforehand than after.

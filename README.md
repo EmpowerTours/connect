@@ -9,7 +9,7 @@ Mobile-first and calm: three tabs. **Today** greets you, shows one insight from 
 > Runs fully locally for development (embedded Postgres, no Docker, no external services). Production runs on Railway; see [Production (Railway)](#production-railway). The product name, host and canonical URL live in one constant: `BRAND` in `src/lib/brand.ts` (rename there; everything user-facing derives from it).
 
 ## Fork it in under an hour
-Connect is MIT-licensed and built to be copied: fork it, rename it, and run your own network for a niche (Monad builders, LatAm fintechs, a single ecosystem…). A fresh clone runs locally with **one command and no accounts**: Postgres is embedded (an npm dependency), so there is no Docker or database to install.
+Connect is open source (AGPL-3.0, see [License](#license)) and built to be copied: fork it, rename it, and run your own network for a niche (Monad builders, LatAm fintechs, a single ecosystem…). A fresh clone runs locally with **one command and no accounts**: Postgres is embedded (an npm dependency), so there is no Docker or database to install.
 
 **You need:** Node.js 20 or newer (`node -v`), npm and git, on macOS, Linux or Windows (x64 or arm64). About 1 GB of disk for dependencies.
 
@@ -180,7 +180,17 @@ Step-by-step launch guide (accounts, variables, domain, R2, first admin, costs, 
 - **Security headers:** nonce-based CSP with `strict-dynamic` for pages (`src/middleware.ts`), plus HSTS, `nosniff`, `X-Frame-Options: DENY`, a strict referrer policy and a Permissions-Policy that only allows passkeys on this origin (`src/lib/security-headers.ts`). Session and locale cookies are `Secure` in production.
 - **News ingest without a cron:** when someone opens Today or Signals and the feeds are older than 6 hours, one ingest runs in the background after the response (a shared claim in Redis keeps it to one run per 30 minutes across instances). Admins can refresh by hand on `/signals`. An external scheduler can call `POST /api/cron/ingest` with `Authorization: Bearer $CRON_SECRET`; without a 32+ character `CRON_SECRET` that route is a 404.
 
-## Contributing, security and license
+## Contributing and security
 - Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
 - Found a vulnerability? Please report it privately: see [SECURITY.md](SECURITY.md).
-- Code is released under the [MIT License](LICENSE). Organization names and the favicons in `public/logos/` are trademarks of their respective owners, are included only to identify those organizations, and are not covered by the MIT License.
+- Contributions are accepted under the contributor grant in [CONTRIBUTING.md](CONTRIBUTING.md#licensing-your-contribution).
+
+## License
+**GNU AGPL-3.0**: see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+Copyright © 2026 EmpowerTours S.A.S. de C.V.
+
+You may read, run, modify and redistribute this software. If you run a **modified** version as a network service, AGPL section 13 requires you to offer your users the complete corresponding source of your version under this same license. For a hosted web app that is the clause that matters: you may fork this and run your own network, but you may not fork it, close it, and compete.
+
+**Dual licensed.** AGPL-3.0 as above, or a **commercial license** from EmpowerTours S.A.S. de C.V. for anyone who wants to build on this without AGPL section 13's obligations, i.e. to run a modified version as a service with their own source closed. Enquiries: admin@empowertours.xyz
+
+No rights are granted to the EmpowerTours name or logo. Organization names and the favicons in `public/logos/` are trademarks of their respective owners, are included only to identify those organizations, and are not covered by either license.
