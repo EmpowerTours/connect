@@ -21,10 +21,11 @@ export default defineRailway((ctx) => {
     healthcheck: "/api/health",
     healthcheckTimeout: 120,
     replicas: 1,
-    domains: ctx.environment === "production" ? ["connect.empowertours.xyz"] : [],
+    domains: ctx.environment === "production" ? [{ domain: "connect.empowertours.xyz", port: 3000 }] : [],
     env: {
       DATABASE_URL: db.env.DATABASE_URL,
       NODE_ENV: "production",
+      PORT: "3000",
       NEXT_PUBLIC_RP_ID: "empowertours.xyz",
       STORAGE_DRIVER: "s3",
       S3_REGION: "auto",
