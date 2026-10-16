@@ -66,7 +66,12 @@ async function HomeFeed({ viewer, tab, ctx, algorithm }: { viewer: FeedViewer; t
         icon={tab === "following" ? Users : Sparkles}
         title={t(locale, "home.emptyTitle")}
         body={t(locale, "home.emptyBody")}
-        action={<Link href="/channels" className="btn-primary">{t(locale, "home.findChannels")}</Link>}
+        action={
+          <div className="flex flex-wrap justify-center gap-2">
+            <Link href="/channels" className="btn-primary">{t(locale, "home.findChannels")}</Link>
+            <Link href="/import" className="btn-secondary">{t(locale, "nav.import")}</Link>
+          </div>
+        }
       />
     );
   }

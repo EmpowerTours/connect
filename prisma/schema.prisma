@@ -59,6 +59,15 @@ model User {
   mutedTopics         String        @default("[]")
   /// JSON list of channel slugs muted in every feed.
   mutedChannels       String        @default("[]")
+  /// Farcaster account linked through the importer. Only a VERIFIED link
+  /// (this profile's Mera wallet is a custody or verified address of the fid)
+  /// makes the member findable by other people's Farcaster follows.
+  farcasterFid        Int?
+  farcasterUsername   String        @default("")
+  farcasterVerified   Boolean       @default(false)
+  /// X account id from the member's own X archive (account.js), recorded only
+  /// when its username matches linkX. Self-declared, like linkX itself.
+  xAccountId          String?
   createdAt           DateTime      @default(now())
 
   likes            Like[]
@@ -82,6 +91,14 @@ model User {
   orgClaims     OrgClaim[]
   orgRequests   OrgRequest[]
   reports       Report[]
+
+  importSuggestions ImportSuggestion[] @relation("SuggestionOwner")
+  suggestedTo       ImportSuggestion[] @relation("SuggestionTarget")
+  importRuns        ImportRun[]
+  walletPackChecks  WalletPackCheck[]
+
+  @@index([farcasterFid])
+  @@index([xAccountId])
 }
 
 /// A user's claim to work at an organization. Pending until an admin
@@ -358,6 +375,7 @@ model Channel {
   createdAt   DateTime        @default(now())
   members     ChannelMember[]
   posts       Post[]
+  suggestions ImportSuggestion[]
 }
 
 model ChannelMember {
@@ -476,4 +494,56 @@ model FollowUser {
   createdAt  DateTime @default(now())
 
   @@id([followerId, followeeId])
+}
+
+/// A follow (person) or join (channel) suggested by a cold-start importer.
+/// Nothing is followed until the member confirms it.
+model ImportSuggestion {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation("SuggestionOwner", fields: [userId], references: [id], onDelete: Cascade)
+  /// "user:<id>" | "channel:<id>" — one row per suggestion target.
+  key          String
+  targetUserId String?
+  targetUser   User?    @relation("SuggestionTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  channelId    String?
+  channel      Channel? @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  /// JSON SuggestionReason[] (src/lib/importers/suggestions.ts)
+  reasons      String   @default("[]")
+  /// pending | followed | dismissed
+  status       String   @default("pending")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, key])
+  @@index([userId, status])
+}
+
+/// One importer run, so the page can say what was found even when nobody matched.
+model ImportRun {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// farcaster | x | wallet
+  source    String
+  /// Accounts / memberships found at the source.
+  found     Int      @default(0)
+  /// Suggestions created from them.
+  matched   Int      @default(0)
+  /// JSON details for display (account name, packs, notes).
+  detail    String   @default("{}")
+  createdAt DateTime @default(now())
+
+  @@index([userId, source, createdAt])
+}
+
+/// Cached read-only balanceOf result for a wallet starter pack (chain 143).
+model WalletPackCheck {
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  packId    String
+  member    Boolean
+  checkedAt DateTime @default(now())
+
+  @@id([userId, packId])
 }
