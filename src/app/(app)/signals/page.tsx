@@ -6,7 +6,10 @@ import { EmptyState } from "@/components/empty-state";
 import { Columns, PageHeader, RailCard, Tabs } from "@/components/layout";
 import { SubmitButton } from "@/components/submit-button";
 import { timeAgo } from "@/components/time";
-import { getLocale, requireUser } from "@/lib/auth";
+import { after } from "next/server";
+import { getCurrentAuth, getLocale, requireUser } from "@/lib/auth";
+import { isAdmin } from "@/lib/admin";
+import { ingestIfStale } from "@/lib/ingest-schedule";
 import { prisma } from "@/lib/db";
 import { t } from "@/lib/i18n";
 
@@ -16,6 +19,8 @@ export default async function SignalsPage({ searchParams }: { searchParams: Prom
   const user = await requireUser();
   const locale = await getLocale();
   const scope = (await searchParams).scope;
+  const admin = isAdmin(user, (await getCurrentAuth())?.method);
+  after(() => ingestIfStale(prisma).catch((e) => console.error("[ingest]", e)));
   const followed = (await prisma.followOrg.findMany({ where: { userId: user.id }, select: { orgId: true } })).map((f) => f.orgId);
   const where = scope === "following" ? { orgs: { some: { orgId: { in: followed } } } } : scope === "all" ? {} : { orgs: { some: {} } };
   const [signals, feeds] = await Promise.all([
@@ -26,9 +31,11 @@ export default async function SignalsPage({ searchParams }: { searchParams: Prom
     <div className="space-y-4">
       <RailCard title={t(locale, "feed.sources")}>
         <div className="px-4 pb-4 pt-2">
-          <form action={ingestNowAction} className="mb-3">
-            <SubmitButton className="btn-secondary w-full"><RefreshCw size={15} /> {t(locale, "feed.refresh")}</SubmitButton>
-          </form>
+          {admin && (
+            <form action={ingestNowAction} className="mb-3">
+              <SubmitButton className="btn-secondary w-full"><RefreshCw size={15} /> {t(locale, "feed.refresh")}</SubmitButton>
+            </form>
+          )}
           <ul className="space-y-1.5 text-[13px]">
             {feeds.map((f) => (
               <li key={f.id} className="flex justify-between gap-2">

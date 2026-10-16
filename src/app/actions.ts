@@ -6,7 +6,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { devLoginAllowed } from "@/lib/auth-core";
-import { DEMO_EMAIL, LANG_COOKIE, createDemoSession, destroySession, ensureUser, getCurrentUser, getWorkspace, requireUser } from "@/lib/auth";
+import { DEMO_EMAIL, LANG_COOKIE, createDemoSession, destroySession, ensureUser, getCurrentUser, getWorkspace, requireAdmin, requireUser } from "@/lib/auth";
 import { ADVISOR_INFLUENCE, ACTIVITY_KINDS, ORG_TYPES, regionForCountry } from "@/lib/constants";
 import { prisma } from "@/lib/db";
 import { isLocale } from "@/lib/i18n";
@@ -487,8 +487,9 @@ export async function addSignalAction(fd: FormData) {
   revalidatePath("/signals");
 }
 
+/** Admins only: refresh the public news feeds now (they also refresh lazily, see ingest-schedule.ts). */
 export async function ingestNowAction() {
-  await requireUser();
+  await requireAdmin();
   await ingestAllFeeds(prisma);
   revalidatePath("/", "layout");
 }
