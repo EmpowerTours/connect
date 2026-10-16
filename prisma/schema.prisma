@@ -309,6 +309,7 @@ model SignalOrg {
   org      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@id([signalId, orgId])
+  @@index([orgId])
 }
 
 model Post {
@@ -335,6 +336,10 @@ model Post {
 
   @@index([rootId])
   @@index([createdAt])
+  @@index([authorId, createdAt])
+  @@index([channelId, createdAt])
+  @@index([parentId])
+  @@index([quoteOfId])
 }
 
 model PostMention {
@@ -344,6 +349,7 @@ model PostMention {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([postId, userId])
+  @@index([userId])
 }
 
 model Like {
@@ -354,6 +360,7 @@ model Like {
   createdAt DateTime @default(now())
 
   @@id([userId, postId])
+  @@index([postId])
 }
 
 model Recast {
@@ -364,6 +371,7 @@ model Recast {
   createdAt DateTime @default(now())
 
   @@id([userId, postId])
+  @@index([postId])
 }
 
 model Channel {
@@ -387,6 +395,7 @@ model ChannelMember {
   createdAt DateTime @default(now())
 
   @@id([userId, channelId])
+  @@index([channelId])
 }
 
 /// Warm intro: requester asks connector (a mutual connection) to introduce them to target.
@@ -475,6 +484,7 @@ model PostOrg {
   org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@id([postId, orgId])
+  @@index([orgId])
 }
 
 model FollowOrg {
@@ -485,6 +495,7 @@ model FollowOrg {
   createdAt DateTime     @default(now())
 
   @@id([userId, orgId])
+  @@index([orgId])
 }
 
 model FollowUser {
@@ -495,6 +506,7 @@ model FollowUser {
   createdAt  DateTime @default(now())
 
   @@id([followerId, followeeId])
+  @@index([followeeId])
 }
 
 /// A follow (person) or join (channel) suggested by a cold-start importer.
