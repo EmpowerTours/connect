@@ -6,25 +6,28 @@ Lives at **https://connect.empowertours.xyz**. Powered by Monad; sign-in is Mera
 
 Mobile-first and calm: three tabs. **Today** greets you, shows one insight from public news signals, a getting-started checklist for new members and the intro requests waiting on you. **Opportunities** is a wallet-style stack of live asks and offers by topic, each with a "Request intro" (through a mutual connection when there is one, otherwise straight to the author). **Circle** draws your warm network as an orbit (connections on the inner ring, people one intro away on the outer ring); tap someone to see the path and request the intro. Profiles are proof-based, and a private pipeline ("My deals") is still there.
 
-> Local-only MVP. No remote, no deploy, no external services required for the demo. The product name, host and canonical URL live in one constant: `BRAND` in `src/lib/brand.ts` (rename there; everything user-facing derives from it).
+> Runs fully locally for development (embedded Postgres, no Docker, no external services). Production runs on Railway; see [Production (Railway)](#production-railway). The product name, host and canonical URL live in one constant: `BRAND` in `src/lib/brand.ts` (rename there; everything user-facing derives from it).
 
 ## Stack
-Next.js 15 (App Router, server actions) · TypeScript · Tailwind CSS v4 · Prisma 6 + SQLite (swap to Postgres by changing `provider` + `DATABASE_URL`) · Vitest · rss-parser · zod.
+Next.js 15 (App Router, server actions) · TypeScript · Tailwind CSS v4 · Prisma 6 + PostgreSQL (versioned migrations in `prisma/migrations`) · Vitest · rss-parser · zod.
 
 ## Run it
 ```bash
 cd bdnet
 npm install            # also runs prisma generate
-cp .env.example .env   # only DATABASE_URL is needed
-npm run setup          # create SQLite DB + seed 53 real orgs, RSS feeds, topic channels (no people)
+cp .env.example .env   # only DATABASE_URL is needed (already points at the local Postgres)
+npm run db:start       # embedded Postgres on 127.0.0.1:54329, data in .data/postgres; keep it running
+npm run setup          # prisma migrate deploy + seed 53 real orgs, RSS feeds, topic channels (no people)
 npm run seed:demo      # optional, LOCAL ONLY: fictional demo people, asks/offers, intros, demo pipeline
 npm run logos          # optional: fetch org favicons into public/logos (already committed)
 npm run ingest         # optional: pull public RSS news and tag it to orgs
 npm run dev            # http://localhost:3000 → "Continue as demo user" (local demo, no wallet)
 ```
+Database scripts: `npm run db:migrate` (after editing `schema.prisma`: creates a new migration with `prisma migrate dev`; commit it), `npm run db:deploy` (apply migrations), `npm run db:check` (fails if the schema and migrations drift), `npm run db:reset` (drop, re-migrate, base seed). Any Postgres works: point `DATABASE_URL` at it instead of running `db:start`.
+
 Other scripts: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`, `npm run db:reset`, `npm run screenshots` (demo data; needs a running server + Chrome; see `scripts/screenshots.ts`), `npm run screenshots:real` (a brand-new member on a base-seed + real-news database; starts its own server; see `scripts/screenshots-real.ts`), `npm run screenshots:graph` (feeds, importers and the signed graph on a fresh preview database with a local mock hub/RPC; starts its own server; see `scripts/screenshots-graph.ts`), `npm run graph:verify` (see below).
 
-The default seed (`db:seed`, `setup`, `db:reset`) creates **no people and no content**: only the 53 public-fact organizations, the public news feeds and topic channels. Fictional demo people are only added by `npm run seed:demo`, which refuses to run with `NODE_ENV=production`.
+The default seed (`db:seed`, `setup`, `db:reset`) creates **no people and no content**: only the 53 public-fact organizations, the public news feeds and topic channels. Fictional demo people are only added by `npm run seed:demo`, which refuses to run with `NODE_ENV=production`, inside a Railway environment, or against a database that is not on this machine.
 
 ## Features
 **Navigation:** mobile has a floating three-tab bar (Today, Opportunities, Circle) and an avatar menu (`/more`) for Intros, Updates, Channels, My deals, Organizations, Signals, profile and language. Desktop uses a slim side rail and a centered single column. Light theme, light-purple accent (#7C3AED for text and buttons, #A78BFA / #C4B5FD for tints), frosted-glass cards.
@@ -55,7 +58,8 @@ The default seed (`db:seed`, `setup`, `db:reset`) creates **no people and no con
 
 ## Project layout
 ```
-prisma/schema.prisma      data model (SQLite)
+prisma/schema.prisma      data model (PostgreSQL)
+prisma/migrations/        versioned SQL migrations (prisma migrate)
 prisma/seed-data.ts       53 public-fact orgs
 prisma/seed.ts            default/production seed (orgs, feeds, channels; no people)
 prisma/seed-base.ts       the data that seed applies
@@ -119,9 +123,26 @@ npm run graph:verify -- --base https://your-connect-host [--user valeria] [--adm
 npm run graph:verify -- --file graph.json
 ```
 
-The script uses this repo's own domain and types, checks every signature, sequence gaps and duplicates, and admin authority, rebuilds the graph and exits non-zero on any failure. After pulling these changes run `npm run db:push` to add the new tables and columns.
+The script uses this repo's own domain and types, checks every signature, sequence gaps and duplicates, and admin authority, rebuilds the graph and exits non-zero on any failure. After pulling schema changes run `npm run db:deploy` to apply new migrations.
 
 ## Onboarding and profile photos
 After a first Mera passkey sign-in, members go through a five-step welcome flow at `/welcome` (name + headline, organization, region + focus tags, photo + links, first ask/offer) before they reach the app; the local demo user skips it. Picking a listed organization can also file a pending claim (wallet-verified members only); an unlisted one becomes an org request for admin review. Region, focus tags, photo and links stay editable on `/profile`.
 
-Photos are sniffed by magic bytes (JPEG, PNG or WebP only), capped at 5 MB, at least 64 px and at most 40 MP, then re-encoded with sharp to a 512×512 WebP, which drops EXIF/GPS and all other metadata. Storage sits behind a small `BlobStore` interface (`src/lib/storage.ts`); the only driver today is `local` (files under `.data/uploads`, or `UPLOADS_DIR`), served from `/media/avatars/…` with a strict content-type and CSP. An S3/R2 driver can be added behind `STORAGE_DRIVER` without touching callers. Local disk is not durable on serverless hosts, so production needs that driver first.
+Photos are sniffed by magic bytes (JPEG, PNG or WebP only), capped at 5 MB, at least 64 px and at most 40 MP, then re-encoded with sharp to a 512×512 WebP, which drops EXIF/GPS and all other metadata. Storage sits behind a small `BlobStore` interface (`src/lib/storage.ts`), chosen with `STORAGE_DRIVER`:
+- `local` (default): files under `.data/uploads`, or `UPLOADS_DIR`. In production `UPLOADS_DIR` must be an absolute path on a mounted Railway volume (the container disk is replaced on every deploy).
+- `s3`: any S3-compatible bucket through signed requests (`aws4fetch`, no AWS SDK). Recommended: Cloudflare R2 (no egress fees, 10 GB free). Set `S3_ENDPOINT` (`https://<account id>.r2.cloudflarestorage.com`), `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` and `S3_REGION=auto`. The bucket stays private; photos are still served from `/media/avatars/…` on this origin.
+
+Either way photos are served with a strict content-type and CSP.
+
+## Production (Railway)
+Step-by-step launch guide (accounts, variables, domain, R2, first admin, costs): `connect-launch.md` in the workspace root, kept outside the repo.
+
+- **Build:** `Dockerfile` (multi-stage, Node 20, Next `output: "standalone"`). `NEXT_PUBLIC_RP_ID` is inlined at build time, so it must be set as a Railway variable before the first build.
+- **Start:** `node start.mjs` (`scripts/start.mjs`) runs `prisma migrate deploy`, optionally the base seed (`SEED_ON_BOOT=1`, first deploy only), then the standalone server. `NODE_OPTIONS=--max-old-space-size=384` caps the heap; the server idles around 150 MB RSS.
+- **Health:** `GET /api/health` checks the database (200 or 503). Railway waits for it before switching traffic.
+- **Infrastructure as code:** `.railway/railway.ts` declares the service, Postgres, healthcheck, domain and variable names (secret values are kept in Railway with `preserve()`). Railway no longer accepts `railway.json` for new services. `npm run typecheck` also checks this file.
+- **Boot check:** in production the server refuses to start when `DATABASE_URL`, `AUTH_SESSION_SECRET`, `NEXT_PUBLIC_RP_ID`, Upstash, `ADMIN_WALLETS` or the storage variables are missing or unsafe, or when `ALLOW_DEV_LOGIN` is set (`src/lib/env.ts`). Messages name the variable, never the value.
+- **Rate limits:** sign-in nonce and verify, posting, intro requests, reports, photo uploads, imports and graph signing (`src/lib/rate-limit.ts`). Fixed windows in Upstash Redis when configured, in process memory otherwise. Over the limit, APIs answer 429 with `Retry-After`; forms show a translated "try again in N minutes". A Redis outage fails open for rate limits, while login nonces stay fail-closed.
+- **Security headers:** nonce-based CSP with `strict-dynamic` for pages (`src/middleware.ts`), plus HSTS, `nosniff`, `X-Frame-Options: DENY`, a strict referrer policy and a Permissions-Policy that only allows passkeys on this origin (`src/lib/security-headers.ts`). Session and locale cookies are `Secure` in production.
+- **News ingest without a cron:** when someone opens Today or Signals and the feeds are older than 6 hours, one ingest runs in the background after the response (a shared claim in Redis keeps it to one run per 30 minutes across instances). Admins can refresh by hand on `/signals`. An external scheduler can call `POST /api/cron/ingest` with `Authorization: Bearer $CRON_SECRET`; without a 32+ character `CRON_SECRET` that route is a 404.
+
