@@ -33,7 +33,7 @@ export async function createDemoSession(userId: string) {
   const id = token();
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
   await prisma.session.create({ data: { id, userId, expiresAt } });
-  (await cookies()).set(DEMO_SESSION_COOKIE, id, { httpOnly: true, sameSite: "lax", path: "/", expires: expiresAt });
+  (await cookies()).set(DEMO_SESSION_COOKIE, id, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", expires: expiresAt });
 }
 
 export async function destroySession() {

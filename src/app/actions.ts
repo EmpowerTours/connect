@@ -43,7 +43,7 @@ export async function logoutAction() {
 export async function setLocaleAction(fd: FormData) {
   const locale = str(fd, "locale");
   if (!isLocale(locale)) return;
-  (await cookies()).set(LANG_COOKIE, locale, { path: "/", maxAge: 60 * 60 * 24 * 365 });
+  (await cookies()).set(LANG_COOKIE, locale, { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax", secure: process.env.NODE_ENV === "production" });
   const user = await getCurrentUser();
   if (user) await prisma.user.update({ where: { id: user.id }, data: { locale } });
   revalidatePath("/", "layout");
