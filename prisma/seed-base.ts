@@ -49,7 +49,24 @@ export async function seedBase(db: BaseSeedDb) {
   return { orgs: SEED_ORGS.length, feeds: DEFAULT_FEEDS.length, channels: CHANNELS.length };
 }
 
-/** seed:demo creates fictional people; never in production. */
+/**
+ * seed:demo creates fictional people; never in production. Besides NODE_ENV, refuse anything
+ * that looks hosted (a Railway environment, or a database that is not on this machine), so a
+ * `railway run npm run seed:demo` or a copied production DATABASE_URL cannot fill the real network.
+ */
 export function demoSeedAllowed(env: Record<string, string | undefined> = process.env): boolean {
-  return env.NODE_ENV !== "production";
+  if (env.NODE_ENV === "production") return false;
+  if (env.RAILWAY_ENVIRONMENT || env.RAILWAY_ENVIRONMENT_NAME || env.RAILWAY_PROJECT_ID || env.RAILWAY_SERVICE_ID) return false;
+  const url = env.DATABASE_URL;
+  if (url) {
+    let host = "";
+    try {
+      host = new URL(url).hostname;
+    } catch {
+      return url.startsWith("file:");
+    }
+    if (url.startsWith("file:")) return true;
+    if (!["localhost", "127.0.0.1", "::1", "[::1]"].includes(host)) return false;
+  }
+  return true;
 }

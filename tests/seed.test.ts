@@ -45,6 +45,13 @@ describe("production seed", () => {
   it("the demo seed refuses to run in production", () => {
     expect(demoSeedAllowed({ NODE_ENV: "production" })).toBe(false);
     expect(demoSeedAllowed({ NODE_ENV: "development" })).toBe(true);
+    // Hosted environments and remote databases are refused even outside NODE_ENV=production.
+    expect(demoSeedAllowed({ NODE_ENV: "development", RAILWAY_ENVIRONMENT: "production" })).toBe(false);
+    expect(demoSeedAllowed({ RAILWAY_PROJECT_ID: "p" })).toBe(false);
+    expect(demoSeedAllowed({ DATABASE_URL: "postgresql://u:p@postgres.railway.internal:5432/railway" })).toBe(false);
+    expect(demoSeedAllowed({ DATABASE_URL: "postgresql://u:p@roundhouse.proxy.rlwy.net:41234/railway" })).toBe(false);
+    expect(demoSeedAllowed({ DATABASE_URL: "postgresql://connect:x@127.0.0.1:54329/connect" })).toBe(true);
+    expect(demoSeedAllowed({ DATABASE_URL: "postgresql://connect:x@localhost:5432/connect" })).toBe(true);
     const src = readFileSync(new URL("../prisma/seed-demo.ts", import.meta.url), "utf8");
     expect(src).toMatch(/if \(!demoSeedAllowed\(\)\)/);
   });
