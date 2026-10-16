@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
-import { LocalDiskStore, getBlobStore, isMediaKey, newAvatarKey } from "@/lib/storage";
+import { LocalDiskStore, S3Store, getBlobStore, isMediaKey, newAvatarKey, s3ConfigFromEnv } from "@/lib/storage";
 import { MAX_UPLOAD_BYTES, precheckUpload, processAvatar, sniffImageType } from "@/lib/uploads";
 
 const solid = (w: number, h: number) => sharp({ create: { width: w, height: h, channels: 3, background: { r: 124, g: 58, b: 237 } } });
@@ -73,8 +73,69 @@ describe("blob storage", () => {
     expect(await store.get("../../etc/passwd")).toBeNull();
     await expect(store.put("../escape.webp", new Uint8Array([1]))).rejects.toThrow(/invalid media key/);
   });
-  it("fails closed for drivers that do not exist yet", () => {
-    expect(() => getBlobStore({ STORAGE_DRIVER: "s3" })).toThrow(/not implemented/);
+  it("fails closed for unknown drivers and for s3 without its settings", () => {
+    expect(() => getBlobStore({ STORAGE_DRIVER: "ftp" })).toThrow(/not supported/);
+    expect(() => getBlobStore({ STORAGE_DRIVER: "s3" })).toThrow(/S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY/);
+    expect(() => getBlobStore({ ...S3_ENV, S3_ENDPOINT: "http://evil.example" })).toThrow(/https URL/);
     expect(getBlobStore({ STORAGE_DRIVER: "local", UPLOADS_DIR: path.join(tmpdir(), "connect-unused") })).toBeInstanceOf(LocalDiskStore);
+    expect(getBlobStore(S3_ENV)).toBeInstanceOf(S3Store);
+    expect(getBlobStore({ ...S3_ENV, STORAGE_DRIVER: "r2" })).toBeInstanceOf(S3Store);
+  });
+});
+
+const S3_ENV = {
+  STORAGE_DRIVER: "s3",
+  S3_ENDPOINT: "https://acct123.r2.cloudflarestorage.com",
+  S3_BUCKET: "connect-media",
+  S3_ACCESS_KEY_ID: "test-access-key",
+  S3_SECRET_ACCESS_KEY: "test-secret-key",
+};
+
+describe("S3-compatible store (fake endpoint, no network)", () => {
+  function fakeBucket() {
+    const objects = new Map<string, { body: Uint8Array; type: string }>();
+    const seen: Request[] = [];
+    const fetchFn = async (req: Request) => {
+      seen.push(req);
+      const key = new URL(req.url).pathname.replace(/^\/connect-media\//, "");
+      if (req.method === "PUT") {
+        objects.set(key, { body: new Uint8Array(await req.arrayBuffer()), type: req.headers.get("content-type") ?? "" });
+        return new Response(null, { status: 200 });
+      }
+      if (req.method === "GET") {
+        const o = objects.get(key);
+        return o ? new Response(Buffer.from(o.body), { status: 200 }) : new Response("NoSuchKey", { status: 404 });
+      }
+      if (req.method === "DELETE") {
+        objects.delete(key);
+        return new Response(null, { status: 204 });
+      }
+      return new Response(null, { status: 405 });
+    };
+    const cfg = s3ConfigFromEnv(S3_ENV);
+    if (!cfg.ok) throw new Error("config");
+    return { store: new S3Store(cfg.config, fetchFn), objects, seen };
+  }
+
+  it("round-trips with signed, path-style requests to the bucket", async () => {
+    const { store, objects, seen } = fakeBucket();
+    const key = newAvatarKey();
+    await store.put(key, new Uint8Array([7, 8, 9]), "image/webp");
+    expect(objects.get(key)?.type).toBe("image/webp");
+    expect(await store.get(key)).toEqual({ data: Buffer.from([7, 8, 9]), contentType: "image/webp" });
+    await store.delete(key);
+    expect(await store.get(key)).toBeNull();
+    const put = seen[0];
+    expect(put.url).toBe(`https://acct123.r2.cloudflarestorage.com/connect-media/${key}`);
+    expect(put.headers.get("authorization")).toMatch(/^AWS4-HMAC-SHA256 Credential=test-access-key\/\d{8}\/auto\/s3\/aws4_request/);
+    expect(put.headers.get("x-amz-content-sha256")).toBeTruthy();
+  });
+
+  it("refuses bad keys before any request", async () => {
+    const { store, seen } = fakeBucket();
+    await expect(store.put("../escape.webp", new Uint8Array([1]), "image/webp")).rejects.toThrow(/invalid media key/);
+    expect(await store.get("avatars/../../x")).toBeNull();
+    await store.delete("/etc/passwd");
+    expect(seen).toHaveLength(0);
   });
 });
