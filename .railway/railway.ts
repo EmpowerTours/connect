@@ -16,8 +16,9 @@ export default defineRailway((ctx) => {
   const web = service("connect", {
     source: github("EmpowerTours/connect", { branch: "main" }),
     // Dockerfile build (detected automatically). The start script runs `prisma migrate deploy`
-    // and then the standalone Next server; a failed migration stops the deploy.
-    start: "node start.mjs",
+    // and then the standalone Next server; a failed migration stops the deploy. A start command
+    // replaces the image ENTRYPOINT, so tini (signal forwarding, zombie reaping) is named here.
+    start: "/usr/bin/tini -- node start.mjs",
     healthcheck: "/api/health",
     healthcheckTimeout: 120,
     replicas: 1,
