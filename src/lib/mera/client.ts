@@ -28,6 +28,7 @@ import type { LocalAccount } from "viem";
 import { APP_FULL_NAME, BRAND } from "../brand";
 import { EMPOWERTOURS_PRF_SALT, assertOwnRelyingParty, isUsableCredentialId, walletFromPrfOutput } from "./derive";
 import { LINK_STATEMENT, SESSION_STATEMENT, registrationTypedData, sessionTypedData } from "./typed-data";
+import { graphTypedData, isGraphAction, type GraphMessage } from "../graph/typed-data";
 
 /** Same env name as Hunt. "localhost" for local dev. */
 export const RP_ID = process.env.NEXT_PUBLIC_RP_ID ?? "localhost";
@@ -247,6 +248,34 @@ export function linkWalletWithPasskey(mode: "existing" | "new", displayName: str
     const res = await postJson("/api/auth/link", await signSession(p, LINK_STATEMENT));
     if (!res.ok) throw new Error(await errorFrom(res, "Could not link this wallet."));
   });
+}
+
+/**
+ * Sign the member's pending graph updates with one passkey prompt. The typed
+ * data is rebuilt here from the app's own constants (domain, types, pinned
+ * statement); the server only supplies the fields, and every one must name
+ * this wallet as author. Off-chain signatures only: nothing is sent to Monad.
+ */
+export async function signGraphUpdates(): Promise<number> {
+  let stored = 0;
+  await withAccount(signInAccount, async (p) => {
+    const res = await fetch("/api/graph/pending", { cache: "no-store" });
+    if (!res.ok) throw new Error(await errorFrom(res, "Could not load your pending updates."));
+    const body = (await res.json()) as { wallet?: string; messages?: GraphMessage[] };
+    const mine = p.account.address.toLowerCase();
+    if (body.wallet?.toLowerCase() !== mine) throw new Error("This passkey opens a different wallet than the one on your profile.");
+    const messages = body.messages ?? [];
+    if (!messages.length) return;
+    const items = [];
+    for (const m of messages) {
+      if (m.author.toLowerCase() !== mine || !isGraphAction(m.action)) throw new Error("Refusing to sign an update that is not yours.");
+      items.push({ message: m, signature: await p.account.signTypedData(graphTypedData(m)) });
+    }
+    const post = await postJson("/api/graph/sign", { items });
+    if (!post.ok) throw new Error(await errorFrom(post, "Could not publish your updates."));
+    stored = items.length;
+  });
+  return stored;
 }
 
 export function explainPasskeyError(err: unknown): string {

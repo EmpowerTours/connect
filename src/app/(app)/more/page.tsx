@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Hash, ShieldCheck, Handshake, KanbanSquare, Landmark, Languages, Lock, LogOut, Newspaper, PenLine, Radio, UserPlus } from "lucide-react";
+import { ChevronRight, Hash, ShieldCheck, Handshake, KanbanSquare, Landmark, Languages, Lock, LogOut, Newspaper, PenLine, Radio, Share2, UserPlus } from "lucide-react";
 import { logoutAction, setLocaleAction } from "@/app/actions";
 import { UserAvatar } from "@/components/avatar";
 import { avatarUrl } from "@/lib/media";
@@ -27,6 +27,7 @@ export default async function MorePage() {
         { href: "/updates", label: t(locale, "nav.updates"), Icon: Newspaper },
         { href: "/channels", label: t(locale, "nav.channels"), Icon: Hash },
         { href: "/import", label: t(locale, "nav.import"), Icon: UserPlus },
+        { href: "/sync", label: t(locale, "nav.graph"), Icon: Share2 },
       ],
     },
     {
