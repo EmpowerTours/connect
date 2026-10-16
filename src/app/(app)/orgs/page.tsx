@@ -20,7 +20,7 @@ export default async function OrgsPage({ searchParams }: { searchParams: Promise
     where: {
       ...(type ? { type } : {}),
       ...(region ? { region } : {}),
-      ...(q ? { OR: [{ name: { contains: q } }, { country: { contains: q.toUpperCase() } }, { aliases: { contains: q } }, { chainsInUse: { contains: q } }] } : {}),
+      ...(q ? { OR: [{ name: { contains: q, mode: "insensitive" } }, { country: { contains: q.toUpperCase() } }, { aliases: { contains: q, mode: "insensitive" } }, { chainsInUse: { contains: q, mode: "insensitive" } }] } : {}),
     },
     include: {
       deals: { where: { workspaceId: ws.id }, select: { stage: true } },

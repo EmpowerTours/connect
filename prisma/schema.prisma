@@ -1,14 +1,15 @@
-// Corridor (working name) — local dev uses SQLite.
-// To move to Postgres: change provider to "postgresql" and DATABASE_URL.
-// List-like fields (chains, aliases) are stored as JSON-encoded strings so the
-// schema works identically on SQLite and Postgres.
+// EmpowerTours Connect: PostgreSQL everywhere (Railway Postgres in production, the
+// embedded local server from `npm run db:start` in development).
+// Schema changes ship as migrations: `npm run db:migrate -- --name <change>` locally,
+// `prisma migrate deploy` on boot in production.
+// List-like fields (chains, aliases) are stored as JSON-encoded strings.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 

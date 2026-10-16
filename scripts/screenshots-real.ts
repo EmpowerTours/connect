@@ -2,8 +2,9 @@
  * "Real data" screenshots: a brand-new member on a database seeded only with
  * the base seed (53 public orgs, feeds, channels) plus real ingested news.
  *
- *   npx prisma db push && npx tsx prisma/seed.ts && npm run ingest   # with DATABASE_URL=file:./real-preview.db
- *   PREVIEW_DB=file:./real-preview.db npx tsx scripts/screenshots-real.ts
+ *   (npm run db:start in another terminal; any PostgreSQL database works)
+ *   DATABASE_URL=<preview db> npx prisma migrate deploy && npx tsx prisma/seed.ts && npm run ingest
+ *   PREVIEW_DB=<preview db> npx tsx scripts/screenshots-real.ts
  *
  * The script starts its own `next dev` (PORT, default 3188) so it can make a
  * throwaway key the admin for this run only. A headless browser cannot run a
@@ -27,7 +28,8 @@ const PORT = Number(process.env.PORT ?? 3188);
 const BASE = `http://localhost:${PORT}`;
 const OUT = process.env.OUT_DIR ?? path.resolve(process.cwd(), "..");
 const CHROME = process.env.CHROME_PATH ?? "/usr/bin/google-chrome";
-const DB = process.env.PREVIEW_DB ?? "file:./real-preview.db";
+const DB = process.env.PREVIEW_DB ?? "";
+if (!DB) throw new Error("set PREVIEW_DB to a migrated, seeded PostgreSQL database (see the comment at the top)");
 const UPLOADS = process.env.PREVIEW_UPLOADS ?? path.resolve(process.cwd(), ".data", "preview-uploads");
 const file = (name: string) => path.join(OUT, `connect-real-${name}.png`);
 const click = (page: Page, sel: string) => page.locator(sel).first().evaluate((el) => (el as HTMLElement).click());

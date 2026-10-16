@@ -17,7 +17,8 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   const user = await requireUser();
   const locale = await getLocale();
   const q = ((await searchParams).q ?? "").trim();
-  const like = { contains: q };
+  // Postgres `contains` is case-sensitive; search should not be.
+  const like = { contains: q, mode: "insensitive" as const };
   const [people, orgs, channels, posts, ctx] = await Promise.all([
     q ? prisma.user.findMany({ where: { OR: [{ name: like }, { handle: like }, { headline: like }, { orgName: like }] }, take: 8 }) : Promise.resolve([]),
     q

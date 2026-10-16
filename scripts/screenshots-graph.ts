@@ -1,7 +1,8 @@
 /**
  * Screenshots for the programmable feed, the cold-start importers and the
- * signed graph, on a throwaway preview database (a new
- * prisma/graph-preview-<timestamp>.db per run, gitignored) seeded with the clearly-labelled demo people.
+ * signed graph, on a throwaway preview database (a new graph_preview_<timestamp> database
+ * per run in the local PostgreSQL from scripts/lib/local-postgres.ts) seeded with the
+ * clearly-labelled demo people.
  *
  *   npx tsx scripts/screenshots-graph.ts            # OUT_DIR defaults to the parent folder
  *
@@ -25,6 +26,7 @@ import { PrismaClient } from "@prisma/client";
 import { chromium, request, type APIRequestContext, type Page } from "playwright-core";
 import { generatePrivateKey, privateKeyToAccount, type PrivateKeyAccount } from "viem/accounts";
 import { graphTypedData, type GraphMessage } from "../src/lib/graph/typed-data";
+import { ensureDatabase, startLocalPostgres } from "./lib/local-postgres";
 import { SESSION_STATEMENT, sessionTypedData } from "../src/lib/mera/typed-data";
 
 const PORT = Number(process.env.PORT ?? 3189);
@@ -33,8 +35,9 @@ const BASE = `http://localhost:${PORT}`;
 const MOCK = `http://localhost:${MOCK_PORT}`;
 const OUT = process.env.OUT_DIR ?? path.resolve(process.cwd(), "..");
 const CHROME = process.env.CHROME_PATH ?? "/usr/bin/google-chrome";
-/** A brand-new SQLite file per run (gitignored), so nothing existing is ever reset. */
-const DB = `file:./graph-preview-${Date.now()}.db`;
+/** A brand-new database per run in the local PostgreSQL, so nothing existing is ever reset. */
+const DB_NAME = `graph_preview_${Date.now()}`;
+let DB = "";
 const file = (name: string) => path.join(OUT, `connect-${name}.png`);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -170,9 +173,11 @@ async function waitForServer() {
 }
 
 /* ---------- preview database ---------- */
-function resetDb() {
+async function createPreviewDb() {
+  const { pg } = await startLocalPostgres();
+  DB = await ensureDatabase(pg, DB_NAME);
   const env = { ...process.env, DATABASE_URL: DB, NODE_ENV: "development" as const };
-  execFileSync("npx", ["prisma", "db", "push", "--skip-generate"], { env, stdio: "ignore" });
+  execFileSync("npx", ["prisma", "migrate", "deploy"], { env, stdio: "ignore" });
   execFileSync("npx", ["tsx", "prisma/seed-demo.ts"], { env, stdio: "ignore" });
 }
 
@@ -308,7 +313,7 @@ function terminalHtml(blocks: { title: string; text: string; ok: boolean; label?
 }
 
 async function main() {
-  resetDb();
+  await createPreviewDb();
   const db = new PrismaClient({ datasources: { db: { url: DB } } });
   await seedScenario(db);
   const mock = startMock();
