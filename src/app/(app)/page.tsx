@@ -10,6 +10,7 @@ import { timeAgo } from "@/components/time";
 import { after } from "next/server";
 import { getLocale, getWorkspace, requireUser } from "@/lib/auth";
 import { ingestIfStale } from "@/lib/ingest-schedule";
+import { reportError } from "@/lib/error-report";
 import { prisma } from "@/lib/db";
 import { t, type Locale } from "@/lib/i18n";
 import { connectionsOf } from "@/lib/intros";
@@ -25,7 +26,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   const now = new Date();
   const ws = await getWorkspace(user.id);
   const welcome = (await searchParams).welcome === "1";
-  after(() => ingestIfStale(prisma).catch((e) => console.error("[ingest]", e)));
+  after(() => ingestIfStale(prisma).catch((e) => reportError("background ingest failed", e, { scope: "ingest" })));
   // Hero: the busiest org in public news this week, falling back to the last 30 days for quiet weeks.
   const since = new Date(now.getTime() - 30 * 86_400_000);
   const [requests, deals, follows, signals, claims, myOpps, edges] = await Promise.all([

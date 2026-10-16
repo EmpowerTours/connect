@@ -40,6 +40,7 @@ export function parseReasons(raw: string | null | undefined): SuggestionReason[]
         !!r && typeof r === "object" && typeof (r as SuggestionReason).source === "string" && typeof (r as SuggestionReason).code === "string" && typeof (r as SuggestionReason).detail === "string",
     );
   } catch {
+    // Intentional: unreadable stored reasons show as none.
     return [];
   }
 }

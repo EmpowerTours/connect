@@ -3,7 +3,7 @@
 # static assets, migrations and a pinned Prisma CLI for `migrate deploy`.
 
 FROM node:20-bookworm-slim AS base
-RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates tini && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
 FROM base AS deps
@@ -35,7 +35,10 @@ ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     HOSTNAME=0.0.0.0 \
     PORT=3000 \
-    NODE_OPTIONS=--max-old-space-size=384
+    # Heap cap well under the ~384 MB container budget: native memory (sharp/libvips,
+    # Prisma's query engine, buffers) lives outside the V8 heap, so a heap cap equal to
+    # the budget lets the container be OOM-killed before V8 ever collects garbage.
+    NODE_OPTIONS=--max-old-space-size=256
 RUN useradd --system --uid 1001 --create-home connect
 COPY --from=build --chown=connect /app/.next/standalone ./
 COPY --from=build --chown=connect /app/.next/static ./.next/static
@@ -47,4 +50,8 @@ COPY --from=prisma-cli --chown=connect /prisma-cli ./prisma-cli
 COPY --chown=connect scripts/start.mjs ./start.mjs
 USER connect
 EXPOSE 3000
+# tini is PID 1: it forwards SIGTERM/SIGINT to node and reaps zombies (e.g. the Prisma CLI
+# child). Node as PID 1 ignores signals it has no handler for. A Railway start command
+# replaces ENTRYPOINT, so .railway/railway.ts starts with tini explicitly too.
+ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["node", "start.mjs"]

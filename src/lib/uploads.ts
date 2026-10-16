@@ -11,6 +11,12 @@
  */
 import sharp from "sharp";
 
+// Memory: the server runs in a ~384 MB container. libvips' operation cache and one
+// worker thread per core would hold far more than one 512 px avatar needs, so keep
+// both off/minimal. Uploads are rare; a little latency is the right trade.
+sharp.cache(false);
+sharp.concurrency(1);
+
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 export const MAX_PIXELS = 40_000_000;
 export const MIN_SIDE = 64;

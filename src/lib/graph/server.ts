@@ -2,6 +2,7 @@ import "server-only";
 import type { Prisma, User } from "@prisma/client";
 import { adminWallets } from "../admin";
 import { prisma } from "../db";
+import { logger } from "../log";
 import { ADMIN_ACTIONS, GRAPH_STATEMENT, ZERO_ADDRESS, isGraphAction, type GraphMessage } from "./typed-data";
 import { checkGraphLog, verifyGraphEvent, type SignedGraphEvent } from "./verify";
 import { planGraphOps, prepareMessages, validateBatch, type GraphDbState, type PendingOp, type SubmitError } from "./plan";
@@ -134,8 +135,15 @@ export async function acceptSigned(user: User, items: { message: GraphMessage; s
         }),
       ),
     );
-  } catch {
-    return { ok: false, status: 409, error: "conflict" };
+  } catch (e) {
+    // A unique violation (digest, or author+seq) means a concurrent or replayed submit: 409.
+    // Anything else is a real database fault and must not be disguised as a conflict.
+    if ((e as { code?: unknown }).code === "P2002") {
+      logger.info("graph submit conflict", { scope: "graph", count: items.length });
+      return { ok: false, status: 409, error: "conflict" };
+    }
+    logger.error("graph submit failed", { scope: "graph", count: items.length, err: e });
+    throw e;
   }
   return { ok: true, stored: items.length };
 }

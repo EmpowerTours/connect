@@ -1,0 +1,69 @@
+# Checks every pull request and every push to main (Railway deploys main).
+# Nothing here deploys or pushes an image. All env values below are dummies, not secrets.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+  # Public, non-secret: the shared passkey rpId that production builds must inline.
+  NEXT_PUBLIC_RP_ID: empowertours.xyz
+  # Dummy URL so the Prisma CLI accepts the schema. CI never connects to it.
+  DATABASE_URL: postgresql://ci:ci-not-a-secret@127.0.0.1:5432/ci
+
+jobs:
+  check:
+    name: Typecheck, lint, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 20 matches the Docker image (node:20-bookworm-slim).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Prisma client
+        run: npx prisma generate
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      # Replays prisma/migrations into a throwaway embedded Postgres (127.0.0.1) and fails
+      # if schema.prisma has changes no migration covers.
+      - name: Migrations match the schema
+        run: npm run db:check
+
+      - name: Build
+        run: npx next build
+
+  docker:
+    name: Docker image builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image (not pushed)
+        run: docker build --build-arg NEXT_PUBLIC_RP_ID="$NEXT_PUBLIC_RP_ID" --tag connect:ci .

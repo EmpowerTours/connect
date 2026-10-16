@@ -34,6 +34,7 @@ function ytdPayload(text: string): unknown | undefined {
   try {
     return JSON.parse(text.slice(m[0].length).replace(/;\s*$/, ""));
   } catch {
+    // Intentional: an unreadable archive file is counted as skipped by the caller.
     return undefined;
   }
 }

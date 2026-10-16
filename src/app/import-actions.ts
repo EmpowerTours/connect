@@ -57,6 +57,7 @@ export async function importFarcasterAction(fd: FormData) {
   if (!username && !wallet) redirect("/import?fcError=need_wallet#farcaster");
 
   const provider = getFarcasterProvider();
+  let fcPartial = false;
   try {
     const account = username ? await provider.findByUsername(username) : (await provider.findByAddresses([wallet!]))[0] ?? null;
     if (!account) redirect(`/import?fcError=${username ? "not_found" : "not_found_wallet"}#farcaster`);
@@ -66,7 +67,8 @@ export async function importFarcasterAction(fd: FormData) {
       if (verified) await tx.user.updateMany({ where: { farcasterFid: account.fid, NOT: { id: user.id } }, data: { farcasterVerified: false } });
       await tx.user.update({ where: { id: user.id }, data: { farcasterFid: account.fid, farcasterUsername: account.username, farcasterVerified: verified } });
     });
-    const fids = await provider.following(account.fid, MAX_FOLLOWING);
+    // Bounded walk (per-request timeouts plus an overall budget); a slow source yields a partial list.
+    const { fids, partial } = await provider.followingWithStatus(account.fid, MAX_FOLLOWING);
     const members = await prisma.user.findMany({
       where: { farcasterVerified: true, farcasterFid: { in: fids } },
       select: { id: true, farcasterFid: true, farcasterVerified: true, farcasterUsername: true },
@@ -77,12 +79,13 @@ export async function importFarcasterAction(fd: FormData) {
       reason: { source: "farcaster", code: "fc_follow", detail: m.username },
     }));
     const matched = await persistDrafts(user.id, drafts);
-    await recordRun(user.id, "farcaster", fids.length, matched, { fid: account.fid, username: account.username, verified, provider: provider.name });
+    await recordRun(user.id, "farcaster", fids.length, matched, { fid: account.fid, username: account.username, verified, provider: provider.name, partial });
+    if (partial) fcPartial = true;
   } catch (e) {
     if (e instanceof FarcasterUnavailable) redirect(`/import?fcError=unavailable&why=${encodeURIComponent(e.message)}#farcaster`);
     throw e;
   }
-  done("farcaster");
+  done("farcaster", fcPartial ? "&partial=farcaster" : "");
 }
 
 /* ---------- X archive upload ---------- */

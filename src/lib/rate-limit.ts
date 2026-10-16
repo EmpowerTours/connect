@@ -11,6 +11,7 @@
  */
 import { Redis } from "@upstash/redis";
 import { BRAND } from "./brand";
+import { logger } from "./log";
 
 export interface LimitRule {
   limit: number;
@@ -112,7 +113,7 @@ export async function checkLimit(
     // Namespaced so Connect can share one Upstash database with other EmpowerTours apps.
     count = await store.hit(`${BRAND.subdomain}:rl:${name}:${subject}:${window}`, rule.windowSeconds);
   } catch (e) {
-    console.error(`[rate-limit] ${name} store failed; allowing`, e);
+    logger.error("rate limit store failed; allowing", { scope: "rate-limit", limit: name, err: e });
     return { ok: true, limit: rule.limit, remaining: rule.limit, retryAfter: 0 };
   }
   const ok = count <= rule.limit;
@@ -153,7 +154,7 @@ export function defaultRateLimitStore(env: Record<string, string | undefined> = 
   }
   if (env.NODE_ENV === "production" && !warned) {
     warned = true;
-    console.warn("[rate-limit] UPSTASH_REDIS_REST_URL not set: limits are per instance (in memory)");
+    logger.warn("UPSTASH_REDIS_REST_URL not set: rate limits are per instance (in memory)", { scope: "rate-limit" });
   }
   return memoryStore;
 }

@@ -23,6 +23,15 @@ describe("checkProductionEnv", () => {
     expect(checkProductionEnv(GOOD).errors).toEqual([]);
   });
 
+  it("SENTRY_DSN is optional: unset is fine, a valid one is fine, a malformed one only warns", () => {
+    const sentryWarnings = (env: Record<string, string | undefined>) => checkProductionEnv(env).warnings.filter((w) => w.startsWith("SENTRY_DSN"));
+    expect(sentryWarnings(GOOD)).toEqual([]);
+    expect(sentryWarnings({ ...GOOD, SENTRY_DSN: "https://abc123@o1.ingest.sentry.io/456" })).toEqual([]);
+    expect(checkProductionEnv({ ...GOOD, SENTRY_DSN: "not a dsn" }).errors).toEqual([]);
+    expect(sentryWarnings({ ...GOOD, SENTRY_DSN: "not a dsn" })).toHaveLength(1);
+    expect(sentryWarnings({ ...GOOD, SENTRY_DSN: "not a dsn" })[0]).not.toContain("not a dsn"); // names, never values
+  });
+
   it("accepts local storage on an absolute volume path", () => {
     const env = { ...GOOD, STORAGE_DRIVER: "local", UPLOADS_DIR: "/data/uploads" };
     expect(checkProductionEnv(env).errors).toEqual([]);

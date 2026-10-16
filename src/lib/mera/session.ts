@@ -66,6 +66,7 @@ export function readSession(token: string | null | undefined, nowMs: number = Da
   try {
     payload = JSON.parse(Buffer.from(body.slice(TOKEN_VERSION.length + 1), "base64url").toString("utf8")) as SessionPayload;
   } catch {
+    // Intentional: a token that fails to decode is simply not a session.
     return bad;
   }
   if (typeof payload?.w !== "string" || !isAddress(payload.w, { strict: false })) return bad;
@@ -89,6 +90,7 @@ export function readCookie(req: Request, name: string): string | null {
     try {
       return decodeURIComponent(raw);
     } catch {
+      // Intentional: a malformed %-escape falls back to the raw value.
       return raw;
     }
   }
