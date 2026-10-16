@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  FOLLOW_BUDGET_MS,
   FarcasterUnavailable,
   HubProvider,
+  REQUEST_TIMEOUT_MS,
   NeynarProvider,
   getFarcasterProvider,
   isOwnAccount,
@@ -95,6 +97,98 @@ describe("farcaster importer", () => {
     const { fetcher } = fakeFetch({});
     expect(getFarcasterProvider({}, fetcher).name).toBe("hub");
     expect(getFarcasterProvider({ NEYNAR_API_KEY: "k" }, fetcher).name).toBe("neynar");
+  });
+
+  it("hub and Neynar: every request carries an abort signal (10 s default)", async () => {
+    expect(REQUEST_TIMEOUT_MS).toBe(10_000);
+    expect(FOLLOW_BUDGET_MS).toBe(25_000);
+    const signals: (AbortSignal | undefined)[] = [];
+    const fetcher: Fetcher = async (url, init) => {
+      signals.push(init?.signal);
+      if (url.includes("userNameProofByName")) return { ok: true, status: 200, text: async () => JSON.stringify({ fid: 42 }) };
+      if (url.includes("by_username")) return { ok: true, status: 200, text: async () => JSON.stringify({ user: { fid: 9 } }) };
+      return { ok: true, status: 200, text: async () => "{}" };
+    };
+    await new HubProvider(fetcher).findByUsername("ana");
+    await new HubProvider(fetcher).following(42, 10);
+    await new NeynarProvider(fetcher, "k").findByUsername("sofia");
+    await new NeynarProvider(fetcher, "k").following(9, 10);
+    expect(signals.length).toBeGreaterThanOrEqual(5);
+    expect(signals.every((s) => s instanceof AbortSignal && !s.aborted)).toBe(true);
+  });
+
+  /** A fetch that never answers on its own; it rejects only when its signal aborts, like real fetch. */
+  const hanging: Fetcher = (_url, init) =>
+    new Promise((_resolve, reject) => {
+      const signal = init?.signal;
+      if (!signal) return; // would hang forever: the test times out and fails
+      signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+    });
+
+  it("a request that hangs is aborted and reported as a timeout", async () => {
+    const hub = new HubProvider(hanging, "https://hub.example", { requestTimeoutMs: 30 });
+    await expect(hub.findByUsername("ana")).rejects.toThrow(new FarcasterUnavailable("timeout"));
+    const neynar = new NeynarProvider(hanging, "k", { requestTimeoutMs: 30 });
+    await expect(neynar.findByAddresses([ME])).rejects.toThrow(new FarcasterUnavailable("timeout"));
+    await expect(neynar.following(9, 10)).rejects.toThrow(new FarcasterUnavailable("timeout"));
+  });
+
+  it("a slow body read counts against the same timeout", async () => {
+    const slowBody: Fetcher = async (_url, init) => ({
+      ok: true,
+      status: 200,
+      text: () => new Promise<string>((_r, reject) => init?.signal?.addEventListener("abort", () => reject(init.signal!.reason), { once: true })),
+    });
+    await expect(new HubProvider(slowBody, "https://hub.example", { requestTimeoutMs: 30 }).findByUsername("ana")).rejects.toThrow("timeout");
+  });
+
+  it("follow walk: stops at the time budget and returns what it has as partial", async () => {
+    let clock = 0;
+    const page = (n: number) => ({ messages: [{ data: { linkBody: { targetFid: 100 + n } } }], nextPageToken: `p${n + 1}` });
+    const timeouts: number[] = [];
+    const fetcher: Fetcher = async (url, init) => {
+      timeouts.push(init?.signal ? 1 : 0);
+      const n = Number(new URL(url).searchParams.get("pageToken")?.slice(1) ?? 0);
+      clock += 10_000; // each page "takes" 10 s
+      return { ok: true, status: 200, text: async () => JSON.stringify(page(n)) };
+    };
+    const hub = new HubProvider(fetcher, "https://hub.example", { now: () => clock });
+    const res = await hub.followingWithStatus(1, 1000);
+    // 25 s budget: pages start at t=0, 10 s and 20 s; at 30 s the budget is spent.
+    expect(res).toEqual({ fids: [100, 101, 102], partial: true });
+    expect(timeouts).toEqual([1, 1, 1]);
+    expect(await new HubProvider(fetcher, "https://hub.example", { now: () => clock }).following(1, 2)).toEqual([100, 101]); // the limit stops it inside the budget
+  });
+
+  it("follow walk: a complete list is not partial", async () => {
+    const { fetcher } = fakeFetch({ linksByFid: { messages: [{ data: { linkBody: { targetFid: 5 } } }], nextPageToken: "" } });
+    expect(await new HubProvider(fetcher).followingWithStatus(1, 100)).toEqual({ fids: [5], partial: false });
+  });
+
+  it("follow walk: a later page that times out keeps the earlier pages (partial)", async () => {
+    let calls = 0;
+    const fetcher: Fetcher = (url, init) => {
+      calls++;
+      if (calls === 1) return Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify({ users: [{ user: { fid: 11 } }], next: { cursor: "c2" } }) });
+      return hanging(url, init);
+    };
+    const res = await new NeynarProvider(fetcher, "k", { requestTimeoutMs: 30 }).followingWithStatus(9, 100);
+    expect(res).toEqual({ fids: [11], partial: true });
+  });
+
+  it("follow walk: no time left before the first page is a clear timeout error", async () => {
+    const { fetcher, calls } = fakeFetch({ linksByFid: { messages: [], nextPageToken: "" } });
+    await expect(new HubProvider(fetcher, "https://hub.example", { followBudgetMs: 0 }).followingWithStatus(1, 10)).rejects.toThrow(new FarcasterUnavailable("timeout"));
+    expect(calls).toHaveLength(0);
+    const first = new HubProvider(hanging, "https://hub.example", { requestTimeoutMs: 30 });
+    await expect(first.followingWithStatus(1, 10)).rejects.toThrow("timeout");
+  });
+
+  it("a plain network failure is still 'network', not 'timeout'", async () => {
+    const down: Fetcher = async () => {
+      throw new TypeError("fetch failed");
+    };
+    await expect(new HubProvider(down).findByUsername("ana")).rejects.toThrow(new FarcasterUnavailable("network"));
   });
 
   it("matches only members whose Farcaster link is verified", () => {

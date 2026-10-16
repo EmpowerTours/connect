@@ -15,7 +15,7 @@ import { shortAddress } from "@/lib/mera/format";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Bring your network" };
 
-type Search = { ran?: string; followed?: string; dismissed?: string; fcError?: string; xError?: string; walletError?: string };
+type Search = { ran?: string; followed?: string; dismissed?: string; fcError?: string; xError?: string; walletError?: string; partial?: string };
 
 function FarcasterMark({ size = 18 }: { size?: number }) {
   return (
@@ -130,6 +130,9 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
           </form>
           <p className="mt-2 text-[12px] text-faint">{t(locale, hasWallet ? "import.fc.walletHint" : "import.fc.noWalletHint")}</p>
           <ErrorNote code={sp.fcError} locale={locale} />
+          {sp.partial === "farcaster" && !sp.fcError && (
+            <p role="status" className="mt-3 rounded-xl bg-accent-soft px-3 py-2 text-[13px] text-accent-ink">{t(locale, "import.partial")}</p>
+          )}
           <RunSummary run={lastRun("farcaster")} locale={locale} />
         </section>
 
