@@ -118,7 +118,7 @@ async function main() {
         env: { ...env, OUT: simOut },
         encoding: "utf8",
       });
-      const m = /Estimated amount required:\s*([\d.]+) ETH/.exec(sim.stdout ?? "");
+      const m = /Estimated amount required:\s*([\d.]+) (?:ETH|MON)/.exec(sim.stdout ?? "");
       rmSync(path.join(C, simOut), { force: true });
       if (sim.status !== 0 || !m) {
         console.error((sim.stdout ?? "").slice(-2000), (sim.stderr ?? "").slice(-2000));
