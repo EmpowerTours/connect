@@ -7,7 +7,7 @@ import { PhotoPicker } from "@/components/photo-picker";
 import { SubmitButton } from "@/components/submit-button";
 import { VerifiedOnMonad } from "@/components/wallet-badge";
 import { getLocale, requireUser } from "@/lib/auth";
-import { isPlaceholderHandle, isPlaceholderName } from "@/lib/handles";
+import { isGeneratedPlaceholder, isPlaceholderName } from "@/lib/handles";
 import { APP_NAME } from "@/lib/brand";
 import { ORG_TYPES, REGIONS } from "@/lib/constants";
 import { prisma } from "@/lib/db";
@@ -94,7 +94,7 @@ function StepYou({ user, locale }: { user: U; locale: Locale }) {
           <AtSign size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-faint" />
           <input
             name="handle"
-            defaultValue={isPlaceholderHandle(user.handle) ? "" : user.handle}
+            defaultValue={isGeneratedPlaceholder(user) ? "" : user.handle}
             maxLength={25}
             pattern="@?[A-Za-z0-9_]{2,24}"
             autoCapitalize="none"
@@ -105,7 +105,7 @@ function StepYou({ user, locale }: { user: U; locale: Locale }) {
             data-testid="onb-handle"
           />
         </span>
-        <span className="mt-1.5 block text-[12px] text-faint">{t(locale, isPlaceholderHandle(user.handle) ? "handle.hintAuto" : "handle.hint")}</span>
+        <span className="mt-1.5 block text-[12px] text-faint">{t(locale, isGeneratedPlaceholder(user) ? "handle.hintAuto" : "handle.hint")}</span>
       </label>
       <label className={field}>
         <span className="label">{t(locale, "onb.headline")}</span>

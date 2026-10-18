@@ -9,7 +9,7 @@ import { VerifiedOnMonad } from "@/components/wallet-badge";
 import { Columns, PageHeader } from "@/components/layout";
 import { SubmitButton } from "@/components/submit-button";
 import { getLocale, requireUser } from "@/lib/auth";
-import { isPlaceholderHandle, isPlaceholderName } from "@/lib/handles";
+import { isGeneratedPlaceholder, isPlaceholderHandle, isPlaceholderName } from "@/lib/handles";
 import { prisma } from "@/lib/db";
 import { REGIONS } from "@/lib/constants";
 import { REGION_LABELS, t } from "@/lib/i18n";
@@ -51,7 +51,7 @@ export default async function EditProfilePage({ searchParams }: { searchParams: 
               <AtSign size={16} className={ico} />
               <input
                 name="handle"
-                defaultValue={placeholder ? "" : user.handle}
+                defaultValue={isGeneratedPlaceholder(user) ? "" : user.handle}
                 required
                 maxLength={25}
                 pattern="@?[A-Za-z0-9_]{2,24}"

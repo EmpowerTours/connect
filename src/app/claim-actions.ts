@@ -76,7 +76,7 @@ export async function requestOrgAction(fd: FormData) {
   if (dup) {
     // Sending the same request again updates it (new details, new logo) instead of stacking copies.
     await prisma.orgRequest.update({ where: { id: dup.id }, data: { ...fields, ...(logoKey ? { logoKey } : {}) } });
-    if (logoKey) await deleteStoredImage(dup.logoKey);
+    if (logoKey) await deleteImageIfUnused(dup.logoKey);
   } else {
     await prisma.orgRequest.create({ data: { userId: user.id, name: r.value.name, ...fields, logoKey: logoKey ?? null } });
   }
@@ -114,7 +114,7 @@ export async function updateOrgRequestAction(fd: FormData) {
     if (logoKey !== req.logoKey) await deleteStoredImage(logoKey);
     return fail("not_pending");
   }
-  if (logoKey !== req.logoKey) await deleteStoredImage(req.logoKey);
+  if (logoKey !== req.logoKey) await deleteImageIfUnused(req.logoKey);
   revalidatePath("/orgs");
   revalidatePath("/admin");
   redirect("/orgs?reqSaved=1#my-requests");
@@ -141,9 +141,16 @@ export async function updateOrgLogoAction(fd: FormData) {
     return fail("photo_empty");
   }
   await prisma.organization.update({ where: { id: org.id }, data: { logoKey } });
-  if (logoKey !== org.logoKey) await deleteStoredImage(org.logoKey);
+  if (logoKey !== org.logoKey) await deleteImageIfUnused(org.logoKey);
   revalidatePath("/", "layout");
   redirect(`${back}&logoSaved=1#logo`);
+}
+
+/** An approved request and its organization share one logo file: delete it only when neither points at it anymore. */
+async function deleteImageIfUnused(key: string | null) {
+  if (!key) return;
+  const [orgs, requests] = await Promise.all([prisma.organization.count({ where: { logoKey: key } }), prisma.orgRequest.count({ where: { logoKey: key } })]);
+  if (orgs + requests === 0) await deleteStoredImage(key);
 }
 
 /* ---------- admin side ---------- */
@@ -192,20 +199,33 @@ export async function adminDecideOrgRequestAction(fd: FormData) {
   let linked = plan.kind === "link";
   let slug = "";
   try {
-    slug = await approveOrgRequest(req, plan, decided);
+    try {
+      slug = await approveOrgRequest(req, plan, decided);
+    } catch (e) {
+      // The org was added between the read above and the insert (unique slug): link to it instead.
+      if (!isUniqueViolation(e) || plan.kind !== "create") throw e;
+      const now = await prisma.organization.findMany({ select: { id: true, slug: true, name: true } });
+      const retry = planOrgApproval(req, now);
+      if (retry.kind !== "link") throw e;
+      slug = await approveOrgRequest(req, retry, decided);
+      linked = true;
+    }
   } catch (e) {
-    // The org was added between the read above and the insert (unique slug): link to it instead.
-    if (!isUniqueViolation(e) || plan.kind !== "create") throw e;
-    const now = await prisma.organization.findMany({ select: { id: true, slug: true, name: true } });
-    const retry = planOrgApproval(req, now);
-    if (retry.kind !== "link") throw e;
-    slug = await approveOrgRequest(req, retry, decided);
-    linked = true;
+    // Another admin (or a second tap) decided it while this approval ran; the transaction rolled back.
+    if (!(e instanceof DecidedConcurrently)) throw e;
+    const now = await prisma.orgRequest.findUnique({ where: { id: req.id }, select: { status: true } });
+    return done(`done=already_${now?.status ?? "decided"}`);
   }
   revalidatePath("/admin");
   revalidatePath("/orgs");
   if (slug) revalidatePath(`/orgs/${slug}`);
   return done(linked ? "done=linked" : "done=approved");
+}
+
+class DecidedConcurrently extends Error {
+  constructor() {
+    super("request was decided concurrently");
+  }
 }
 
 type RequestWithUser = Prisma.OrgRequestGetPayload<{ include: { user: true } }>;
@@ -234,7 +254,7 @@ async function approveOrgRequest(req: RequestWithUser, plan: Exclude<OrgApproval
       });
     }
     const closed = await tx.orgRequest.updateMany({ where: { id: req.id, status: "pending" }, data: { status: "approved", orgId: org.id, ...decided } });
-    if (closed.count === 0) throw new Error("request was decided concurrently");
+    if (closed.count === 0) throw new DecidedConcurrently();
     // The requester usually works there: open a pending membership claim for review, unless they already have one.
     if (req.user.walletVerified) {
       const claim = await tx.orgClaim.findUnique({ where: { userId_orgId: { userId: req.userId, orgId: org.id } }, select: { id: true } });

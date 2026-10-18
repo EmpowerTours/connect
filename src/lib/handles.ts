@@ -26,6 +26,15 @@ export function isPlaceholderName(name: string): boolean {
   return name.trim().toLowerCase() === PLACEHOLDER_NAME.toLowerCase();
 }
 
+/**
+ * The account still has what a nameless sign-up generated: the "New member" name and a
+ * placeholder-shaped handle. A member who picked a handle like user3 themselves, or already set a
+ * real name, is not touched.
+ */
+export function isGeneratedPlaceholder(user: { handle: string; name: string }): boolean {
+  return isPlaceholderHandle(user.handle) && isPlaceholderName(user.name);
+}
+
 /** "@Ana_Ruiz " -> "ana_ruiz". */
 export function normalizeHandle(raw: string): string {
   return raw.trim().replace(/^@+/, "").toLowerCase();

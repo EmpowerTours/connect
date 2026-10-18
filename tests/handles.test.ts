@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { handleFromName } from "@/lib/auth-core";
-import { PLACEHOLDER_NAME, isPlaceholderHandle, isPlaceholderName, normalizeHandle, suggestHandle, validateHandle } from "@/lib/handles";
+import { PLACEHOLDER_NAME, isGeneratedPlaceholder, isPlaceholderHandle, isPlaceholderName, normalizeHandle, suggestHandle, validateHandle } from "@/lib/handles";
 
 describe("handles", () => {
   it("a sign-up without a name gets a placeholder handle, which is detected", () => {
@@ -43,5 +43,14 @@ describe("handles", () => {
     expect(suggestHandle("Member", new Set())).toBeNull();
     const s = suggestHandle("李小龙", new Set());
     expect(s === null || validateHandle(s).ok).toBe(true);
+  });
+
+  it("treats only untouched nameless sign-ups as generated placeholders", () => {
+    expect(isGeneratedPlaceholder({ handle: "new_member", name: "New member" })).toBe(true);
+    expect(isGeneratedPlaceholder({ handle: "new_member3", name: "New member" })).toBe(true);
+    // A handle the member chose, or an account that already has a real name, is left alone.
+    expect(isGeneratedPlaceholder({ handle: "user3", name: "Alice" })).toBe(false);
+    expect(isGeneratedPlaceholder({ handle: "new_member", name: "Earvin" })).toBe(false);
+    expect(isGeneratedPlaceholder({ handle: "earvin", name: "New member" })).toBe(false);
   });
 });
