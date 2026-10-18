@@ -13,6 +13,7 @@ import { prisma } from "@/lib/db";
 import { ORG_TYPE_LABELS, REGION_LABELS, t, type Locale } from "@/lib/i18n";
 import { parseList } from "@/lib/json";
 import { avatarUrl } from "@/lib/media";
+import { isPlaceholderHandle, isPlaceholderName } from "@/lib/handles";
 import { FOCUS_TAGS, MAX_FOCUS_TAGS, ONBOARDING_STEPS, isFocusTag, isOnboardingError, type OnboardingStep } from "@/lib/onboarding";
 import { OPP_BODY_MAX, OPP_HEADLINE_MAX } from "@/lib/opportunities";
 
@@ -85,7 +86,26 @@ function StepYou({ user, locale }: { user: U; locale: Locale }) {
       </div>
       <label className={field}>
         <span className="label">{t(locale, "onb.name")}</span>
-        <input name="name" defaultValue={user.name} required maxLength={80} autoComplete="name" className="input" />
+        <input name="name" defaultValue={isPlaceholderName(user.name) ? "" : user.name} required maxLength={80} autoComplete="name" className="input" />
+      </label>
+      <label className={field}>
+        <span className="label">{t(locale, "handle.label")}</span>
+        <span className="relative block">
+          <AtSign size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-faint" />
+          <input
+            name="handle"
+            defaultValue={isPlaceholderHandle(user.handle) ? "" : user.handle}
+            maxLength={25}
+            pattern="@?[A-Za-z0-9_]{2,24}"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            className="input pl-10"
+            placeholder={t(locale, "handle.placeholder")}
+            data-testid="onb-handle"
+          />
+        </span>
+        <span className="mt-1.5 block text-[12px] text-faint">{t(locale, isPlaceholderHandle(user.handle) ? "handle.hintAuto" : "handle.hint")}</span>
       </label>
       <label className={field}>
         <span className="label">{t(locale, "onb.headline")}</span>

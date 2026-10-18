@@ -61,7 +61,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
         </h2>
         {orgs.map((o) => (
           <Link key={o.id} href={`/orgs/${o.slug}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-black/[0.03]">
-            <OrgLogo slug={o.slug} name={o.name} size={40} />
+            <OrgLogo slug={o.slug} name={o.name} size={40} src={avatarUrl(o.logoKey)} />
             <span className="min-w-0">
               <span className="block font-semibold">{o.name}</span>
               <span className="block text-sm text-faint">{ORG_TYPE_LABELS[locale][o.type]}{o.country && ` · ${o.country}`}</span>

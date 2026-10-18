@@ -9,6 +9,7 @@ import { VerifiedOnMonad } from "@/components/wallet-badge";
 import { Columns, PageHeader } from "@/components/layout";
 import { SubmitButton } from "@/components/submit-button";
 import { getLocale, requireUser } from "@/lib/auth";
+import { isPlaceholderHandle, isPlaceholderName } from "@/lib/handles";
 import { prisma } from "@/lib/db";
 import { REGIONS } from "@/lib/constants";
 import { REGION_LABELS, t } from "@/lib/i18n";
@@ -29,6 +30,7 @@ export default async function EditProfilePage({ searchParams }: { searchParams: 
   const ico = "pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-faint";
   const orgs = await prisma.organization.findMany({ select: { name: true }, orderBy: { name: "asc" } });
   const field = "block";
+  const placeholder = isPlaceholderHandle(user.handle);
   return (
     <Columns>
       <PageHeader title={t(locale, "profile.edit")} back={`/u/${user.handle}`} />
@@ -36,9 +38,33 @@ export default async function EditProfilePage({ searchParams }: { searchParams: 
         {saved && <p role="status" className="rounded-xl bg-accent-soft p-3 text-sm font-medium text-accent-ink">{t(locale, "profile.saved")}</p>}
         {extrasError && <p role="alert" className="rounded-xl bg-danger/10 p-3 text-sm text-danger">{extrasError}</p>}
         {error === "handle" && <p className="rounded-xl bg-danger/10 p-3 text-sm text-danger">{t(locale, "profile.handleTaken")}</p>}
+        {placeholder && (
+          <p role="status" className="rounded-xl border border-lilac/80 bg-accent-soft/60 p-3 text-sm text-accent-ink" data-testid="handle-placeholder">
+            {t(locale, "handle.pickPrompt")}
+          </p>
+        )}
         <form action={updateProfileAction} className="grid gap-4 sm:grid-cols-2">
-          <label className={field}><span className="label">{t(locale, "profile.name")}</span><input name="name" defaultValue={user.name} required className="input" /></label>
-          <label className={field}><span className="label">{t(locale, "profile.handle")}</span><input name="handle" defaultValue={user.handle} required pattern="[a-z0-9_]{2,24}" className="input" /></label>
+          <label className={field}><span className="label">{t(locale, "profile.name")}</span><input name="name" defaultValue={isPlaceholderName(user.name) ? "" : user.name} required maxLength={80} className="input" /></label>
+          <label className={field}>
+            <span className="label">{t(locale, "profile.handle")}</span>
+            <span className="relative block">
+              <AtSign size={16} className={ico} />
+              <input
+                name="handle"
+                defaultValue={placeholder ? "" : user.handle}
+                required
+                maxLength={25}
+                pattern="@?[A-Za-z0-9_]{2,24}"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder={t(locale, "handle.placeholder")}
+                className="input pl-10"
+                data-testid="profile-handle"
+              />
+            </span>
+            <span className="mt-1.5 block text-[12px] text-faint">{t(locale, "handle.hint")}</span>
+          </label>
           <label className={field}><span className="label">{t(locale, "profile.role")}</span><input name="role" defaultValue={user.headline || user.role} className="input" /></label>
           <label className={field}><span className="label">{t(locale, "profile.org")}</span><input name="orgName" defaultValue={user.orgName} list="orgs" className="input" /></label>
           <datalist id="orgs">{orgs.map((o) => <option key={o.name} value={o.name} />)}</datalist>

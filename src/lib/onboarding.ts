@@ -128,6 +128,7 @@ export function onboardingChecklist(s: ChecklistState): { items: ChecklistItem[]
 /** Error codes the onboarding/profile actions redirect with (whitelisted before display). */
 export const ONBOARDING_ERRORS = [
   "name_empty", "name_long", "headline_empty", "headline_long", "body_long", "kind",
+  "handle_format", "handle_reserved", "handle_taken",
   "org_name_empty", "org_name_long", "org_website", "org_type", "org_exists",
   "region", "tags_empty", "tags_many", "tag",
   "link_x", "link_linkedin", "link_website",
