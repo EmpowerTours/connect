@@ -7,26 +7,21 @@ import { requireUser } from "@/lib/auth";
 import { canClaim, validateOrgRequest } from "@/lib/claims";
 import { prisma } from "@/lib/db";
 import { toList } from "@/lib/json";
+import { pickPackIds } from "@/lib/curated-packs";
+import { applyPacks } from "@/lib/curated-packs-db";
+import { runFarcasterImport } from "@/lib/importers/farcaster-run";
+import { confirmSuggestions } from "@/lib/importers/persist";
 import { resolveOrgChoice, validateBasics, validateFocus, validateLinks } from "@/lib/onboarding";
-import { validateOpportunity } from "@/lib/opportunities";
 import { getBlobStore, newAvatarKey } from "@/lib/storage";
 import { processAvatar } from "@/lib/uploads";
 
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
 const step = (s: string, error?: string) => `/welcome?step=${s}${error ? `&error=${error}` : ""}`;
 
-/** Step 1: name + headline. */
-export async function saveBasicsAction(fd: FormData) {
-  const user = await requireUser();
-  const r = validateBasics({ name: str(fd, "name"), headline: str(fd, "headline") });
-  if (!r.ok) redirect(step("you", r.error));
-  await prisma.user.update({ where: { id: user.id }, data: { name: r.value.name, headline: r.value.headline, role: r.value.headline } });
-  redirect(step("org"));
-}
+type Member = Awaited<ReturnType<typeof requireUser>>;
 
-/** Step 2: pick an existing org (optionally claim membership) or request a new one. */
-export async function saveOrgAction(fd: FormData) {
-  const user = await requireUser();
+/** The organization part of step 1: an existing org (optionally claim membership), a new one to request, or none. */
+async function applyOrgChoice(user: Member, fd: FormData, headline: string): Promise<string | null> {
   const orgs = await prisma.organization.findMany({ select: { id: true, name: true, slug: true } });
   const choice = resolveOrgChoice(str(fd, "org"), orgs);
   if (choice.kind === "existing") {
@@ -36,24 +31,35 @@ export async function saveOrgAction(fd: FormData) {
       if (canClaim(user, existing).ok) {
         await prisma.orgClaim.upsert({
           where: { userId_orgId: { userId: user.id, orgId: choice.orgId } },
-          create: { userId: user.id, orgId: choice.orgId, title: user.headline },
-          update: { status: "pending", title: user.headline, decidedAt: null, decidedBy: null },
+          create: { userId: user.id, orgId: choice.orgId, title: headline },
+          update: { status: "pending", title: headline, decidedAt: null, decidedBy: null },
         });
       }
     }
   } else if (choice.kind === "new") {
     const r = validateOrgRequest({ name: choice.name, website: str(fd, "website"), type: str(fd, "type") }, orgs);
-    if (!r.ok) redirect(step("org", `org_${r.error}`));
+    if (!r.ok) return `org_${r.error}`;
     await prisma.user.update({ where: { id: user.id }, data: { orgId: null, orgName: r.value.name } });
     const dup = await prisma.orgRequest.findFirst({ where: { userId: user.id, name: r.value.name, status: "pending" } });
     if (!dup) await prisma.orgRequest.create({ data: { userId: user.id, name: r.value.name, website: r.value.website, type: r.value.type } });
   } else {
     await prisma.user.update({ where: { id: user.id }, data: { orgId: null, orgName: "" } });
   }
+  return null;
+}
+
+/** Step 1: name, headline and organization (pick one, claim membership, or request a new one). */
+export async function saveBasicsAction(fd: FormData) {
+  const user = await requireUser();
+  const r = validateBasics({ name: str(fd, "name"), headline: str(fd, "headline") });
+  if (!r.ok) redirect(step("you", r.error));
+  await prisma.user.update({ where: { id: user.id }, data: { name: r.value.name, headline: r.value.headline, role: r.value.headline } });
+  const orgError = await applyOrgChoice(user, fd, r.value.headline);
+  if (orgError) redirect(step("you", orgError));
   redirect(step("focus"));
 }
 
-/** Step 3: region + focus tags. */
+/** Step 2: region + focus tags (also the focus card on Edit profile). */
 export async function saveFocusAction(fd: FormData) {
   const user = await requireUser();
   const back = str(fd, "back") === "profile";
@@ -64,7 +70,7 @@ export async function saveFocusAction(fd: FormData) {
     revalidatePath("/", "layout");
     redirect("/profile?saved=1#focus");
   }
-  redirect(step("profile"));
+  redirect(step("follow"));
 }
 
 /** Store a new profile photo for `userId`; returns an error code or null. */
@@ -79,11 +85,10 @@ async function storeAvatar(userId: string, oldKey: string | null, file: File): P
   return null;
 }
 
-/** Step 4 (and Edit profile): optional photo + links. Finishes the profile part of onboarding. */
+/** Edit profile: optional photo + links. */
 export async function saveProfileExtrasAction(fd: FormData) {
   const user = await requireUser();
-  const back = str(fd, "back") === "profile" ? "/profile" : null;
-  const fail = (e: string) => redirect(back ? `${back}?error=${e}#photo` : step("profile", e));
+  const fail = (e: string) => redirect(`/profile?error=${e}#photo`);
   const links = validateLinks({ x: str(fd, "x"), linkedin: str(fd, "linkedin"), website: str(fd, "website") });
   if (!links.ok) fail(`link_${links.error}`);
   const photo = fd.get("photo");
@@ -92,11 +97,9 @@ export async function saveProfileExtrasAction(fd: FormData) {
     const err = await storeAvatar(user.id, user.avatarKey, photo);
     if (err) fail(`photo_${err}`);
   }
-  if (links.ok) {
-    await prisma.user.update({ where: { id: user.id }, data: { ...links.value, onboardedAt: user.onboardedAt ?? new Date() } });
-  }
+  if (links.ok) await prisma.user.update({ where: { id: user.id }, data: links.value });
   revalidatePath("/", "layout");
-  redirect(back ? `${back}?saved=1#photo` : step("first"));
+  redirect("/profile?saved=1#photo");
 }
 
 export async function removePhotoAction() {
@@ -108,15 +111,24 @@ export async function removePhotoAction() {
   revalidatePath("/", "layout");
 }
 
-/** Step 5: first ask/offer (or skip). */
-export async function firstOpportunityAction(fd: FormData) {
+/** Step 3: look up who the member follows on Farcaster; matches come back as suggestions on this step. */
+export async function onboardingFarcasterAction(fd: FormData) {
   const user = await requireUser();
-  const now = new Date();
-  if (!user.onboardedAt) await prisma.user.update({ where: { id: user.id }, data: { onboardedAt: now } });
-  if (fd.get("skip") === "1") redirect("/?welcome=1");
-  const r = validateOpportunity({ kind: str(fd, "kind"), headline: str(fd, "headline"), body: str(fd, "body"), region: user.region, topic: str(fd, "topic") });
-  if (!r.ok) redirect(step("first", r.error));
-  await prisma.opportunity.create({ data: { ...r.value, orgName: user.orgName, orgId: user.orgId, authorId: user.id } });
-  revalidatePath("/opportunities");
+  const back = "/welcome?step=follow";
+  if (!(await limitMember(user.id, "import")).ok) redirect(`${back}&fcError=rate_limited#farcaster`);
+  const r = await runFarcasterImport(user, str(fd, "username"));
+  if (!r.ok) redirect(`${back}&fcError=${r.error}#farcaster`);
+  redirect(`${back}&fc=${r.matched}${r.partial ? "&partial=1" : ""}#farcaster`);
+}
+
+/** Step 3 (finish): follow the chosen starter packs and Farcaster matches, then land on Today. */
+export async function finishOnboardingAction(fd: FormData) {
+  const user = await requireUser();
+  if (fd.get("skip") !== "1") {
+    await applyPacks(user.id, pickPackIds(fd.getAll("packs").map(String)));
+    await confirmSuggestions(user.id, fd.getAll("ids").map(String));
+  }
+  if (!user.onboardedAt) await prisma.user.update({ where: { id: user.id }, data: { onboardedAt: new Date() } });
+  revalidatePath("/", "layout");
   redirect("/?welcome=1");
 }

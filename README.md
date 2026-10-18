@@ -142,7 +142,7 @@ Updates and channel feeds rank through small `FeedAlgorithm` plugins (`src/lib/f
 
 ## Cold-start importers (`/import`)
 Everything found becomes a **suggestion**; nothing is followed until the member ticks and confirms.
-- **Farcaster:** reads who you follow from a Farcaster hub (`FARCASTER_HUB_URL`, default the free public hub `https://haatz.quilibrium.com`; or Neynar when `NEYNAR_API_KEY` is set). Lookup by username, or by your Mera wallet when it is the account's custody address (hubs cannot search verified addresses; Neynar can). Only members whose Connect wallet is verified on their Farcaster account are matched. If the hub is unreachable the card says so; nothing else breaks.
+- **Farcaster:** reads who you follow from a Farcaster hub (`FARCASTER_HUB_URL`, default the free public hub `https://haatz.quilibrium.com`). Public hubs only: no key and no third-party API. Lookup by username, or by your Mera wallet when it is the account's custody address (hubs cannot search verified addresses). Only members whose Connect wallet is verified on their Farcaster account are matched. If the hub is unreachable the card says so; nothing else breaks.
 - **X:** upload `following.js` (plus `account.js`) from the X data export, or a CSV of handles. Nothing is sent to X. Matching uses the X link members put on their profile, so it is self-declared and labelled that way.
 - **Wallet starter packs:** read-only `eth_call` balance checks on Monad (chain 143, `MONAD_RPC_URL`, default `https://rpc.monad.xyz`) for the EmpowerTours Passport (Hunt), TURBO cohort and TOURS token contracts. Only `eth_call`, `eth_chainId` and `eth_blockNumber` are allowed; results are cached for a day.
 
@@ -159,7 +159,12 @@ npm run graph:verify -- --file graph.json
 The script uses this repo's own domain and types, checks every signature, sequence gaps and duplicates, and admin authority, rebuilds the graph and exits non-zero on any failure. After pulling schema changes run `npm run db:deploy` to apply new migrations.
 
 ## Onboarding and profile photos
-After a first Mera passkey sign-in, members go through a five-step welcome flow at `/welcome` (name + headline, organization, region + focus tags, photo + links, first ask/offer) before they reach the app; the local demo user skips it. Picking a listed organization can also file a pending claim (wallet-verified members only); an unlisted one becomes an org request for admin review. Region, focus tags, photo and links stay editable on `/profile`.
+After a first Mera passkey sign-in, members go through a three-step welcome flow at `/welcome` before they reach the app; the local demo user skips it:
+1. **You:** name, headline and organization. Picking a listed organization can also file a pending claim (wallet-verified members only); an unlisted one becomes an org request for admin review.
+2. **Focus:** region and focus tags.
+3. **Follow:** **starter packs** and an optional **Farcaster import**. Starter packs (`src/lib/curated-packs.ts`) are curated follow sets built from the seeded organizations and channels: picking one follows its organizations, joins its channels and follows up to 12 people (members verified at those organizations, then the most active posters in those channels). The two packs that best match the focus tags are preselected. The Farcaster lookup uses the same importer as `/import` (public Farcaster hub); people you follow there who are already here show up ticked, and an empty Connect bio is filled from your Farcaster bio. If the source is unreachable the step says so and the packs still work.
+
+Photo, links and a first ask/offer are no longer onboarding steps: the Today checklist points to them, and region, focus tags, photo and links stay editable on `/profile`.
 
 Photos are sniffed by magic bytes (JPEG, PNG or WebP only), capped at 5 MB, at least 64 px and at most 40 MP, then re-encoded with sharp to a 512×512 WebP, which drops EXIF/GPS and all other metadata. Storage sits behind a small `BlobStore` interface (`src/lib/storage.ts`), chosen with `STORAGE_DRIVER`:
 - `local` (default): files under `.data/uploads`, or `UPLOADS_DIR`. In production `UPLOADS_DIR` must be an absolute path on a mounted Railway volume (the container disk is replaced on every deploy).

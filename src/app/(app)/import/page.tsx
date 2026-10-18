@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Check, ChevronRight, FileUp, Hash, ShieldCheck, Sparkles, UserPlus, Wallet, X as XIcon } from "lucide-react";
 import { dismissSuggestionsAction, followSuggestionsAction, importFarcasterAction, importWalletAction, importXAction } from "@/app/import-actions";
 import { UserAvatar } from "@/components/avatar";
+import { FarcasterMark } from "@/components/farcaster-mark";
 import { Columns, PageHeader } from "@/components/layout";
 import { SubmitButton } from "@/components/submit-button";
 import { getLocale, requireUser } from "@/lib/auth";
@@ -17,13 +18,6 @@ export const metadata = { title: "Bring your network" };
 
 type Search = { ran?: string; followed?: string; dismissed?: string; fcError?: string; xError?: string; walletError?: string; partial?: string };
 
-function FarcasterMark({ size = 18 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden fill="currentColor">
-      <path d="M5 3h14v18h-2.6v-7.6a4.4 4.4 0 0 0-8.8 0V21H5z" />
-    </svg>
-  );
-}
 function XMark({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden fill="currentColor">

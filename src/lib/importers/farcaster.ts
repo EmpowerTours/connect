@@ -2,15 +2,13 @@
  * Farcaster importer: find the member's Farcaster account and the accounts it
  * follows, then match those to Connect profiles.
  *
- * Read-only, public data. Two providers behind one interface:
- *   - HubProvider: any Farcaster hub / Snapchain HTTP API (FARCASTER_HUB_URL,
- *     default a public hub). No key. A hub cannot look up an account by a
- *     *verified* address, only by custody address, so "find by wallet" may
- *     miss; the member can type their username instead.
- *   - NeynarProvider: Neynar's v2 REST API when NEYNAR_API_KEY is set. Finds
- *     accounts by custody or verified address.
- * Neither is required: without network access or keys the importer reports a
- * friendly error instead of failing the page. Tests inject a fake fetch.
+ * Read-only, public data, from public Farcaster hubs only: HubProvider talks to
+ * any Farcaster hub / Snapchain HTTP API (FARCASTER_HUB_URL, default a public
+ * hub). No key and no paid third-party API. A hub cannot look up an account by
+ * a *verified* address, only by custody address, so "find by wallet" may miss;
+ * the member can type their username instead. Without network access the
+ * importer reports a friendly error instead of failing the page. Tests inject
+ * a fake fetch.
  *
  * Time limits: every request is aborted after REQUEST_TIMEOUT_MS, and the
  * paginated follow walk stops after FOLLOW_BUDGET_MS. When the budget runs out
@@ -30,11 +28,13 @@ export interface FarcasterAccount {
   displayName: string;
   /** Lowercased custody + verified Ethereum addresses. */
   addresses: string[];
+  /** Profile bio, when the account has one (used to prefill an empty Connect bio). */
+  bio?: string;
 }
 
 export interface FarcasterProvider {
-  readonly name: "hub" | "neynar";
-  /** Accounts that have one of these addresses as custody or (Neynar) verified address. */
+  readonly name: "hub";
+  /** Accounts that have one of these addresses as custody address. */
   findByAddresses(addresses: string[]): Promise<FarcasterAccount[]>;
   findByUsername(username: string): Promise<FarcasterAccount | null>;
   /** Fids this account follows, up to `limit`. */
@@ -50,7 +50,7 @@ export interface FollowingResult {
 }
 
 export interface FarcasterTimeouts {
-  /** Per request (hub or Neynar). Default REQUEST_TIMEOUT_MS. */
+  /** Per request. Default REQUEST_TIMEOUT_MS. */
   requestTimeoutMs?: number;
   /** Whole paginated follow walk. Default FOLLOW_BUDGET_MS. */
   followBudgetMs?: number;
@@ -192,17 +192,19 @@ export class HubProvider implements FarcasterProvider {
     ]);
     let username = "";
     let displayName = "";
+    let bio = "";
     for (const m of arr(obj(data).messages)) {
       const body = obj(obj(obj(m).data).userDataBody);
       if (body.type === "USER_DATA_TYPE_USERNAME" && typeof body.value === "string") username = body.value;
       if (body.type === "USER_DATA_TYPE_DISPLAY" && typeof body.value === "string") displayName = body.value;
+      if (body.type === "USER_DATA_TYPE_BIO" && typeof body.value === "string") bio = body.value.trim();
     }
     const addresses = new Set<string>(custody ? [custody.toLowerCase()] : []);
     for (const m of arr(obj(verifications).messages)) {
       const a = obj(obj(obj(m).data).verificationAddAddressBody).address;
       if (typeof a === "string" && ADDRESS.test(a.toLowerCase())) addresses.add(a.toLowerCase());
     }
-    return { fid, username, displayName, addresses: [...addresses] };
+    return { fid, username, displayName, addresses: [...addresses], ...(bio ? { bio } : {}) };
   }
 
   async findByAddresses(addresses: string[]): Promise<FarcasterAccount[]> {
@@ -245,75 +247,8 @@ export class HubProvider implements FarcasterProvider {
   }
 }
 
-/* ---------- Neynar ---------- */
-
-const NEYNAR = "https://api.neynar.com/v2/farcaster";
-
-function neynarAccount(u: unknown): FarcasterAccount | null {
-  const o = obj(u);
-  const fid = Number(o.fid);
-  if (!Number.isInteger(fid) || fid <= 0) return null;
-  const addresses = new Set<string>();
-  if (typeof o.custody_address === "string") addresses.add(o.custody_address.toLowerCase());
-  for (const a of arr(obj(o.verified_addresses).eth_addresses)) if (typeof a === "string") addresses.add(a.toLowerCase());
-  return {
-    fid,
-    username: typeof o.username === "string" ? o.username : "",
-    displayName: typeof o.display_name === "string" ? o.display_name : "",
-    addresses: [...addresses].filter((a) => ADDRESS.test(a)),
-  };
-}
-
-export class NeynarProvider implements FarcasterProvider {
-  readonly name = "neynar" as const;
-  private readonly limits: Limits;
-  constructor(private readonly fetcher: Fetcher, private readonly apiKey: string, timeouts?: FarcasterTimeouts) {
-    this.limits = new Limits(timeouts);
-  }
-  private get(url: string, timeoutMs = this.limits.requestTimeoutMs) {
-    return getJson(this.fetcher, url, { "x-api-key": this.apiKey, accept: "application/json" }, timeoutMs);
-  }
-
-  async findByAddresses(addresses: string[]): Promise<FarcasterAccount[]> {
-    const list = addresses.map((a) => a.toLowerCase()).filter((a) => ADDRESS.test(a));
-    if (!list.length) return [];
-    const res = obj(await this.get(`${NEYNAR}/user/bulk-by-address?addresses=${list.join(",")}`));
-    const out = new Map<number, FarcasterAccount>();
-    for (const users of Object.values(res)) for (const u of arr(users)) {
-      const acc = neynarAccount(u);
-      if (acc) out.set(acc.fid, acc);
-    }
-    return [...out.values()];
-  }
-
-  async findByUsername(username: string): Promise<FarcasterAccount | null> {
-    const name = normalizeFarcasterUsername(username);
-    if (!name) return null;
-    const res = obj(await this.get(`${NEYNAR}/user/by_username?username=${encodeURIComponent(name)}`));
-    return neynarAccount(res.user);
-  }
-
-  async following(fid: number, limit: number): Promise<number[]> {
-    return (await this.followingWithStatus(fid, limit)).fids;
-  }
-
-  followingWithStatus(fid: number, limit: number): Promise<FollowingResult> {
-    return this.limits.walk(fid, limit, async (cursor, timeoutMs) => {
-      const res = obj(await this.get(`${NEYNAR}/following?fid=${fid}&limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`, timeoutMs));
-      const fids: number[] = [];
-      for (const row of arr(res.users)) {
-        const acc = neynarAccount(obj(row).user ?? row);
-        if (acc) fids.push(acc.fid);
-      }
-      const next = String(obj(res.next).cursor ?? "");
-      return { fids, cursor: next === "null" ? "" : next };
-    });
-  }
-}
-
-/** Neynar when NEYNAR_API_KEY is set, otherwise the public hub (FARCASTER_HUB_URL). */
+/** A public Farcaster hub: FARCASTER_HUB_URL, or the default public hub. */
 export function getFarcasterProvider(env: Record<string, string | undefined> = process.env, fetcher: Fetcher = globalThis.fetch as unknown as Fetcher): FarcasterProvider {
-  if (env.NEYNAR_API_KEY) return new NeynarProvider(fetcher, env.NEYNAR_API_KEY);
   return new HubProvider(fetcher, env.FARCASTER_HUB_URL || DEFAULT_HUB_URL);
 }
 
@@ -335,4 +270,14 @@ export function matchFarcasterFollowing(
   return members
     .filter((m) => m.farcasterVerified && m.farcasterFid !== null && fids.has(m.farcasterFid))
     .map((m) => ({ userId: m.id, username: m.farcasterUsername }));
+}
+
+/** Longest bio Connect stores (matches the profile form). */
+export const BIO_MAX = 400;
+
+/** A Farcaster bio to copy into an empty Connect bio, or null. Whitespace collapsed, capped by code points. */
+export function bioToImport(currentBio: string, account: Pick<FarcasterAccount, "bio">): string | null {
+  if (currentBio.trim() || !account.bio) return null;
+  const flat = account.bio.replace(/\s+/g, " ").trim();
+  return flat ? [...flat].slice(0, BIO_MAX).join("") : null;
 }
