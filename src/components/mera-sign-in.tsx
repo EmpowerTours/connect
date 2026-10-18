@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Fingerprint, KeyRound, Loader2, Sparkles } from "lucide-react";
 import { t, type Locale } from "@/lib/i18n";
+import { safeNextPath } from "@/lib/links";
 
 type Busy = null | "signin" | "create" | "link-existing" | "link-new";
 
@@ -32,12 +33,13 @@ function useMeraAction(onDone: () => void) {
 }
 
 /** Sign in / sign up with a Mera passkey wallet. The only wallet this app supports. */
-export function MeraSignIn({ locale }: { locale: Locale }) {
+export function MeraSignIn({ locale, next = null }: { locale: Locale; next?: string | null }) {
   const router = useRouter();
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const { busy, error, run } = useMeraAction(() => {
-    router.replace("/");
+    // Re-checked here too: the prop is server-validated, this keeps the component safe on its own.
+    router.replace(safeNextPath(next) ?? "/");
     router.refresh();
   });
 

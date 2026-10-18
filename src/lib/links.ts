@@ -69,3 +69,38 @@ export function normalizeLinkedIn(raw: string): LinkResult {
 export function linkLabel(url: string): string {
   return url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
 }
+
+const NEXT_MAX = 512;
+const NEXT_BASE = "https://next.invalid";
+/** Pages a sign-in must never bounce back to. */
+const NEXT_REFUSED_PAGES = ["/login", "/welcome"];
+const NEXT_REFUSED_PREFIXES = ["/api/", "/auth/"];
+
+/**
+ * The page to return to after sign-in (`/login?next=…`). Only a same-origin path survives:
+ * no scheme, no "//host" or "/\host" (browsers treat both as another origin), no control
+ * characters, nothing that loops back into sign-in. Anything else is null (go to "/").
+ */
+export function safeNextPath(raw: unknown): string | null {
+  if (typeof raw !== "string" || raw.length < 1 || raw.length > NEXT_MAX) return null;
+  if (!raw.startsWith("/") || raw.startsWith("//") || /[\\\u0000-\u001f\u007f]/.test(raw)) return null;
+  let url: URL;
+  try {
+    url = new URL(raw, NEXT_BASE);
+  } catch {
+    // Intentional: an unparseable path is simply not used.
+    return null;
+  }
+  if (url.origin !== NEXT_BASE) return null;
+  const p = url.pathname;
+  if (p === "/") return null;
+  if (NEXT_REFUSED_PAGES.some((r) => p === r || p.startsWith(`${r}/`))) return null;
+  if (NEXT_REFUSED_PREFIXES.some((r) => p.startsWith(r) || p === r.slice(0, -1))) return null;
+  return `${p}${url.search}${url.hash}`;
+}
+
+/** `/login`, carrying the page to come back to when there is one worth keeping. */
+export function loginPath(next: string | null | undefined): string {
+  const safe = safeNextPath(next);
+  return safe ? `/login?next=${encodeURIComponent(safe)}` : "/login";
+}

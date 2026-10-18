@@ -1,12 +1,14 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { isAdmin } from "./admin";
 import { prisma } from "./db";
 import { SESSION_TTL_MS, devLoginAllowed, handleFromEmail, normalizeEmail } from "./auth-core";
 import { BRAND } from "./brand";
 import { isLocale, type Locale } from "./i18n";
+import { loginPath } from "./links";
+import { PATHNAME_HEADER } from "./request-id";
 import { MERA_SESSION_COOKIE, readSession } from "./mera/session";
 
 /**
@@ -72,7 +74,8 @@ export async function getCurrentUser() {
 /** Every write action goes through this: no session, no write. */
 export async function requireUser() {
   const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  // Back to the page they opened (e.g. a shared profile or post) once they sign in.
+  if (!user) redirect(loginPath((await headers()).get(PATHNAME_HEADER)));
   return user;
 }
 

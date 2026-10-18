@@ -4,6 +4,8 @@
  * middleware, fall back to the upstream header directly.
  */
 export const REQUEST_ID_HEADER = "x-request-id";
+/** Path and query of the page request, stamped by src/middleware.ts (overwriting any client copy). */
+export const PATHNAME_HEADER = "x-connect-path";
 const UPSTREAM = ["x-request-id", "x-railway-request-id", "cf-ray"] as const;
 const SAFE = /^[A-Za-z0-9._:-]{1,128}$/;
 

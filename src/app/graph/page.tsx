@@ -9,7 +9,7 @@ import { listEvents, PAGE_DEFAULT } from "@/lib/graph/public";
 import { t } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Open graph" };
+export const metadata = { title: "Open graph", alternates: { canonical: "/graph" } };
 
 /** Public explorer for the signed graph. No sign-in. */
 export default async function GraphPage({ searchParams }: { searchParams: Promise<{ cursor?: string }> }) {
