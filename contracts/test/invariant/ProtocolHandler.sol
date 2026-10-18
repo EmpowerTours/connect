@@ -192,7 +192,11 @@ contract ProtocolHandler is Base {
             return false;
         }
         if (op.tier == ConnectGateway.Signer.Recovery) return by == ConnectGateway.Signer.OwnerDevice;
-        if (op.tier == ConnectGateway.Signer.OwnerDevice) return by != ConnectGateway.Signer.Owner;
+        if (op.tier == ConnectGateway.Signer.OwnerDevice) {
+            // the recovery address can't veto its own owner + device replacement (M-2)
+            if (by == ConnectGateway.Signer.Recovery) return op.kind != ConnectGateway.Kind.ChangeRecovery;
+            return by != ConnectGateway.Signer.Owner;
+        }
         return true;
     }
 }

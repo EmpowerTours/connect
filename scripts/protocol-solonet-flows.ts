@@ -3,7 +3,8 @@
  * (contracts/deployments/monad-testnet-dryrun-solonet.json) and report the gas Monad actually charges.
  *
  * Flows: register (relayer submits) · add a device instantly (owner + GUARD device) · start a delayed add and
- * cancel it from a device · start a delayed add and finalize it after the dev delay · change recovery on the
+ * cancel it from a device · start a delayed add and finalize it after the dev delay · the old recovery key can't
+ * cancel its owner + device replacement and its reset is cancelled (M-2) · change recovery on the
  * long (7-day in production) path and finalize it.
  *
  * Every tx uses gas limit = estimate × 1.10, because Monad charges the limit. Solonet only (chain 20143):
@@ -120,6 +121,7 @@ async function main() {
   const owner = mnemonicToAccount(ANVIL_MNEMONIC, { addressIndex: 11 });
   const recovery = mnemonicToAccount(ANVIL_MNEMONIC, { addressIndex: 12 });
   const newRecovery = mnemonicToAccount(ANVIL_MNEMONIC, { addressIndex: 13 });
+  const resetTarget = mnemonicToAccount(ANVIL_MNEMONIC, { addressIndex: 14 }); // whoever a stolen recovery key resets to
   const wallet = createWalletClient({ account: relayer, chain: solonet, transport: http(RPC) });
   const gw = dep.gateway;
   const domain: TypedDataDomain = { name: "ConnectProtocol", version: "1", chainId, verifyingContract: gw };
@@ -178,6 +180,27 @@ async function main() {
   const digestOf = async (a: Action, device?: Device) =>
     hashTypedData({ domain, types: actionTypes, primaryType: "Action", message: await message(a, device) });
   const ownerSig = async (a: Action) => owner.signTypedData({ domain, types: actionTypes, primaryType: "Action", message: await message(a) });
+  /** Recovery-address message (the recovery nonce); `by` signs it (the recovery key, or the reset target's consent). */
+  const recoverySig = async (a: Action, by: typeof recovery) =>
+    by.signTypedData({
+      domain,
+      types: actionTypes,
+      primaryType: "Action",
+      message: { ...a, nonce: await read<bigint>("recoveryNonceOf", [a.id]) },
+    });
+  /** Simulates a call that must revert with `error`. */
+  const expectRevert = async (step: string, error: string, functionName: string, args: unknown[]) => {
+    try {
+      await pub.simulateContract({ address: gw, abi, functionName, args, account: relayer });
+    } catch (e) {
+      if (String(e).includes(error)) {
+        console.log(`✓ ${step.padEnd(34)} rejected (${error})`);
+        return;
+      }
+      throw e;
+    }
+    throw new Error(`${step}: expected ${error}, but it would succeed`);
+  };
   const noDevice = { keyType: 0, key: "0x" as Hex, sig: "0x" as Hex };
   /** Co-signature with the owner (owner nonce). */
   const devSig = async (d: Device, a: Action) => ({ keyType: 1, key: d.key, sig: await deviceSign(d, await digestOf(a)) });
@@ -252,12 +275,33 @@ async function main() {
   const recOp = opOf(a, Signer.OwnerDevice, nonce);
   const recStart = Number((await pub.getBlock({ blockNumber: recRc.blockNumber })).timestamp);
 
+  // 6. M-2: a stolen recovery key can't block the member replacing it. It can't cancel the owner + device
+  //    change, and the reset it starts is cancelled by owner + device.
+  let rc = await action(id, Kind.Cancel, { opId: await read<Hex>("opIdOf", [recOp]) });
+  await expectRevert("recovery cancels its replacement", "CannotCancel", "cancel", [rc, { signer: Signer.Recovery, sig: await recoverySig(rc, recovery), device: noDevice }, recOp]);
+  a = await action(id, Kind.RecoveryReset, { account: resetTarget.address });
+  nonce = await read<bigint>("recoveryNonceOf", [id]);
+  await send("start recoveryReset (recovery)", "start", [a, { signer: Signer.Recovery, sig: await recoverySig(a, recovery), device: noDevice }, "0x", await recoverySig(a, resetTarget)]);
+  const resetOp = opOf(a, Signer.Recovery, nonce);
+  rc = await action(id, Kind.Cancel, { opId: await read<Hex>("opIdOf", [resetOp]) });
+  await send("cancel reset (owner + device)", "cancel", [rc, { signer: Signer.OwnerDevice, sig: await ownerSig(rc), device: await devSig(phone, rc) }, resetOp]);
+
   console.log(`  waiting ${dep.delaySeconds}s (dev delay) …`);
   await waitUntil(addStart + dep.delaySeconds);
   await send("finalize delayed addKey (anyone)", "finalize", [addOp, tablet.key]);
   console.log(`  waiting for the long delay (${dep.longDelaySeconds}s) …`);
   await waitUntil(recStart + dep.longDelaySeconds);
   await send("finalize changeRecovery (anyone)", "finalize", [recOp, "0x"]);
+  const idsAddr = await read<Address>("idRegistry");
+  const recoveryNow = await pub.readContract({
+    address: idsAddr,
+    abi: [{ type: "function", name: "recoveryOf", stateMutability: "view", inputs: [{ type: "uint64" }], outputs: [{ type: "address" }] }],
+    functionName: "recoveryOf",
+    args: [id],
+  });
+  if (recoveryNow !== newRecovery.address) throw new Error("recovery address was not replaced");
+  a = await action(id, Kind.RecoveryReset, { account: resetTarget.address });
+  await expectRevert("old recovery key starts a reset", "BadSignature", "start", [a, { signer: Signer.Recovery, sig: await recoverySig(a, recovery), device: noDevice }, "0x", await recoverySig(a, resetTarget)]);
 
   // checks
   const keysAddr = await read<Address>("keyRegistry");
@@ -270,7 +314,7 @@ async function main() {
     });
   const ok = (await canSign(phone.hash)) && (await canSign(laptop.hash)) && (await canSign(tablet.hash)) && !(await canSign(miniApp.hash));
   if (!ok) throw new Error("unexpected key states after flows");
-  console.log("✓ state: phone, laptop, tablet active; mini-app add cancelled; recovery changed");
+  console.log("✓ state: phone, laptop, tablet active; mini-app add cancelled; recovery replaced despite the old recovery key");
 
   const baseFee = (await pub.getBlock()).baseFeePerGas ?? BigInt(0);
   console.log("\nstep | gas used | gas limit (charged) | MON at base fee");

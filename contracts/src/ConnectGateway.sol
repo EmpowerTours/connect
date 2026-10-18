@@ -35,6 +35,10 @@ import {ConnectKeyRegistry} from "./ConnectKeyRegistry.sol";
 ///           Owner + device op   -> recovery, any GUARD device, owner + device
 ///                                  (NOT the owner alone: a thief holding only
 ///                                  the Mera key cannot undo the member)
+///           Owner + device change of recovery
+///                               -> any GUARD device, owner + device; NOT the
+///                                  recovery address it replaces (a stolen
+///                                  recovery key cannot veto its own eviction)
 ///           Recovery reset      -> owner + GUARD device only
 ///           A device can't cancel its own removal when the owner AND
 ///           another device started it; it can cancel an owner-only one (so
@@ -323,7 +327,8 @@ contract ConnectGateway is EIP712 {
         ) return false;
         if (op.tier == Signer.Recovery) return by == Signer.OwnerDevice;
         if (op.tier == Signer.OwnerDevice) {
-            return by == Signer.Recovery || by == Signer.Device || by == Signer.OwnerDevice;
+            if (by == Signer.Recovery) return op.kind != Kind.ChangeRecovery;
+            return by == Signer.Device || by == Signer.OwnerDevice;
         }
         if (op.tier == Signer.Owner) return by != Signer.None;
         return false;

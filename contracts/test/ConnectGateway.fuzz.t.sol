@@ -59,12 +59,13 @@ contract ConnectGatewayFuzzTest is Base {
     }
 
     /// The cancel matrix matches the spec table, checked independently.
-    function testFuzz_cancelMatrix(uint8 tierSel, uint8 bySel, bool deviceIsTarget, bool removal) public view {
+    function testFuzz_cancelMatrix(uint8 tierSel, uint8 bySel, bool deviceIsTarget, uint8 kindSel) public view {
         ConnectGateway.Signer tier = ConnectGateway.Signer(tierSel % 5);
         ConnectGateway.Signer by = ConnectGateway.Signer(bySel % 5);
         ConnectGateway.Op memory op;
         op.tier = tier;
-        op.kind = removal ? ConnectGateway.Kind.RemoveKey : ConnectGateway.Kind.ChangeRecovery;
+        op.kind = ConnectGateway.Kind(1 + kindSel % 6); // the 6 delayed kinds
+        bool removal = op.kind == ConnectGateway.Kind.RemoveKey;
         op.keyHash = keccak256("target");
         bool usesDevice = by == ConnectGateway.Signer.Device || by == ConnectGateway.Signer.OwnerDevice;
         bytes32 deviceHash = usesDevice ? (deviceIsTarget ? op.keyHash : keccak256("other")) : bytes32(0);
@@ -73,14 +74,19 @@ contract ConnectGatewayFuzzTest is Base {
         if (tier == ConnectGateway.Signer.Owner) {
             expected = by != ConnectGateway.Signer.None;
         } else if (tier == ConnectGateway.Signer.OwnerDevice) {
-            expected = by == ConnectGateway.Signer.Recovery || by == ConnectGateway.Signer.Device
-                || by == ConnectGateway.Signer.OwnerDevice;
+            expected = by == ConnectGateway.Signer.Device || by == ConnectGateway.Signer.OwnerDevice
+                || (by == ConnectGateway.Signer.Recovery && op.kind != ConnectGateway.Kind.ChangeRecovery);
         } else if (tier == ConnectGateway.Signer.Recovery) {
             expected = by == ConnectGateway.Signer.OwnerDevice;
         }
         if (removal && usesDevice && deviceIsTarget && tier != ConnectGateway.Signer.Owner) expected = false;
         // The owner alone can never cancel what the member did with a device or recovery.
         if (by == ConnectGateway.Signer.Owner && tier != ConnectGateway.Signer.Owner) assertFalse(expected);
+        // The recovery address can never veto the member replacing it with owner + device.
+        if (
+            by == ConnectGateway.Signer.Recovery && tier == ConnectGateway.Signer.OwnerDevice
+                && op.kind == ConnectGateway.Kind.ChangeRecovery
+        ) assertFalse(expected);
         assertEq(gw.canCancel(op, by, deviceHash), expected);
     }
 

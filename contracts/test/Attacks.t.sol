@@ -308,6 +308,104 @@ contract AttacksTest is Base {
         assertEq(gw.deviceNonceOf(id, p256Hash(phonePk)), 1, "nonce kept on re-add");
     }
 
+    // ------------------------------- M-2: stolen recovery key vs the member
+
+    /// A thief holding only the recovery key can't stop the member (owner +
+    /// device) replacing the recovery address: he can't cancel the change, his
+    /// resets are cancelled, and the change wipes any reset still pending.
+    function test_m2_stolenRecoveryCannotBlockOwnerDeviceReplacement() public {
+        uint64 id = registerDefault();
+        uint256 t0 = block.timestamp; // absolute warps (via-ir caches timestamp reads)
+        address fresh = makeAddr("fresh recovery");
+
+        // thief opens with a reset to himself
+        ConnectGateway.Action memory r = act(id, ConnectGateway.Kind.RecoveryReset);
+        r.account = thief;
+        ConnectGateway.Op memory reset = startOp(r, authRecovery(recoveryPk, r), "", thiefPk);
+
+        // member replaces the recovery address with owner + phone (7 days)
+        ConnectGateway.Action memory a = act(id, ConnectGateway.Kind.ChangeRecovery);
+        a.account = fresh;
+        ConnectGateway.Op memory change = startOp(a, authOD(ownerPk, phonePk, a), "", 0);
+
+        // the stolen recovery key can't veto its own eviction
+        ConnectGateway.Action memory c = cancelAct(id, change);
+        ConnectGateway.Auth memory auth = authRecovery(recoveryPk, c);
+        vm.expectRevert(ConnectGateway.CannotCancel.selector);
+        gw.cancel(c, auth, change);
+
+        // member cancels the thief's resets as they appear (every 3 days)
+        c = cancelAct(id, reset);
+        gw.cancel(c, authOD(ownerPk, phonePk, c), reset);
+        vm.warp(t0 + 3 days);
+        r = act(id, ConnectGateway.Kind.RecoveryReset);
+        r.account = thief;
+        reset = startOp(r, authRecovery(recoveryPk, r), "", thiefPk);
+        c = cancelAct(id, reset);
+        gw.cancel(c, authOD(ownerPk, phonePk, c), reset);
+
+        // a last reset started a day before the change matures
+        vm.warp(t0 + 6 days);
+        r = act(id, ConnectGateway.Kind.RecoveryReset);
+        r.account = thief;
+        ConnectGateway.Op memory late = startOp(r, authRecovery(recoveryPk, r), "", thiefPk);
+
+        vm.warp(t0 + 7 days);
+        gw.finalize(change, "");
+        assertEq(ids.recoveryOf(id), fresh, "recovery replaced");
+
+        // the late reset was invalidated by the change, and the old key is dead
+        vm.warp(t0 + 9 days);
+        vm.expectRevert(ConnectGateway.OpStale.selector);
+        gw.finalize(late, "");
+        assertEq(ids.ownerOf(id), owner);
+        r = act(id, ConnectGateway.Kind.RecoveryReset);
+        r.account = thief;
+        auth = authRecovery(recoveryPk, r);
+        bytes memory consent = ecdsa(thiefPk, digestFor(r, ConnectGateway.Signer.Recovery));
+        vm.expectRevert(ConnectGateway.BadSignature.selector);
+        gw.start(r, auth, "", consent);
+    }
+
+    /// Accepted tradeoff of the M-2 fix: a thief holding the Mera key AND a
+    /// GUARD device can replace the recovery address and the recovery address
+    /// can't stop it. The member's only on-chain defence is another GUARD
+    /// device, which can still cancel.
+    function test_m2_tradeoff_ownerPlusStolenDeviceReplacesRecovery() public {
+        uint64 id = registerDefault();
+        ConnectGateway.Action memory add = actAdd(id, laptopPk, ALL);
+        gw.addKey(add, authOD(ownerPk, phonePk, add), p256Key(laptopPk));
+
+        // thief: Mera key + stolen phone
+        ConnectGateway.Action memory a = act(id, ConnectGateway.Kind.ChangeRecovery);
+        a.account = thief;
+        ConnectGateway.Op memory change = startOp(a, authOD(ownerPk, phonePk, a), "", 0);
+        ConnectGateway.Action memory c = cancelAct(id, change);
+        ConnectGateway.Auth memory auth = authRecovery(recoveryPk, c);
+        vm.expectRevert(ConnectGateway.CannotCancel.selector);
+        gw.cancel(c, auth, change);
+
+        // with a second GUARD device the member still wins
+        gw.cancel(c, authDevice(laptopPk, c), change);
+        assertFalse(isPending(change));
+
+        // without one (laptop retired), recovery's escape is cancelled by the
+        // thief and the replacement lands after 7 days
+        ConnectGateway.Action memory ret = actKey(id, ConnectGateway.Kind.RetireKey, laptopPk);
+        gw.retireKey(ret, devSig(laptopPk, digestDevice(ret, laptopPk)));
+        a = act(id, ConnectGateway.Kind.ChangeRecovery);
+        a.account = thief;
+        change = startOp(a, authOD(ownerPk, phonePk, a), "", 0);
+        ConnectGateway.Action memory r = act(id, ConnectGateway.Kind.RecoveryReset);
+        r.account = newOwner;
+        ConnectGateway.Op memory reset = startOp(r, authRecovery(recoveryPk, r), "", newOwnerPk);
+        c = cancelAct(id, reset);
+        gw.cancel(c, authOD(ownerPk, phonePk, c), reset);
+        vm.warp(block.timestamp + longDelay);
+        gw.finalize(change, "");
+        assertEq(ids.recoveryOf(id), thief, "accepted residual risk");
+    }
+
     // ----------------------------------------- front-running register
 
     function test_frontrun_registerCannotAlterIntent() public {

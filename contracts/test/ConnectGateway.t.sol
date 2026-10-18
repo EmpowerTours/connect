@@ -552,6 +552,17 @@ contract ConnectGatewayTest is Base {
         vm.expectRevert(ConnectGateway.CannotCancel.selector);
         gw.cancel(c, auth, op);
 
+        // the recovery address can't cancel its own owner + device replacement (M-2)
+        auth = authRecovery(recoveryPk, c);
+        vm.expectRevert(ConnectGateway.CannotCancel.selector);
+        gw.cancel(c, auth, op);
+        gw.cancel(c, authDevice(laptopPk, c), op);
+        assertFalse(isPending(op));
+        // ...but it can cancel any other owner + device op
+        ConnectGateway.Action memory tr = act(id, ConnectGateway.Kind.TransferOwner);
+        tr.account = newOwner;
+        op = startOp(tr, authOD(ownerPk, phonePk, tr), "", newOwnerPk);
+        c = cancelAct(id, op);
         gw.cancel(c, authRecovery(recoveryPk, c), op);
         assertFalse(isPending(op));
         op = _odOp(id);

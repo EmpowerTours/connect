@@ -23,6 +23,9 @@ contracts, no owner, no upgrade path:
 - **Cancel matrix:**
   - owner-only ops: the owner, the recovery address or any GUARD device;
   - owner + device ops: recovery, any GUARD device, or owner + device, but not the owner alone;
+  - an owner + device change of recovery: any GUARD device or owner + device, but not the owner
+    alone and not the recovery address it replaces (so a stolen recovery key can't veto its own
+    eviction; audit M-2);
   - the recovery reset: owner + device only;
   - a device can't cancel its own removal when owner + another device started it; it can
     cancel an owner-only removal, so a single-device member survives a stolen Mera key.
@@ -70,7 +73,7 @@ All three modes go through `npm run protocol:deploy`, which:
 | Command | What it does |
 |---|---|
 | `npm run protocol:deploy -- --solonet` | Dry run on local Monad Solonet (`http://localhost:8080`, chain 20143) with a dev build (20 s / 40 s). Uses the public anvil dev account (test mnemonic, index 7). Writes `contracts/deployments/monad-testnet-dryrun-solonet.json` (git-ignored). |
-| `npm run protocol:flows` | The real flows on that Solonet deployment: register, instant add, delayed add (one cancelled, one finalized), change recovery on the long path. Prints the gas charged per step. |
+| `npm run protocol:flows` | The real flows on that Solonet deployment: register, instant add, delayed add (one cancelled, one finalized), change recovery on the long path, and M-2: the old recovery key can't cancel its owner + device replacement, its reset is cancelled by owner + device, and it is dead once the change lands. Prints the gas charged per step. |
 | `npm run protocol:deploy -- --fork` | Dry run on an anvil fork of testnet, with production delays. |
 | `npm run protocol:deploy -- --broadcast` | **Real testnet deploy. Run by you, with your own key.** It reads the key from `DEPLOYER_KEY_FILE` (default `/home/box/.connect/deployer.key`, chmod 600, outside the repo), passes it to forge via env only and never prints it. It simulates first and refuses if the balance can't cover the estimate. It writes `deployments/monad-testnet.json` at the repo root; commit that file. |
 
@@ -92,13 +95,15 @@ Solonet runs the Monad gas schedule (MIP-8 storage pages, limit-charged). At a 1
 
 | Step | Gas charged (limit = estimate × 1.10) | MON |
 |---|---:|---:|
-| Deploy (gateway + 2 registries) | 6,427,634 | 0.643 |
-| Register (+ first device key) | 292,635 | 0.0293 |
-| Add device, instant (owner + device) | 196,010 | 0.0196 |
-| Start delayed add (owner) | 159,606 | 0.0160 |
-| Start change recovery (owner + device) | 161,929 | 0.0162 |
-| Cancel (device) | 141,567 | 0.0142 |
-| Finalize delayed add | 124,121 | 0.0124 |
+| Deploy (gateway + 2 registries) | 6,431,200 | 0.643 |
+| Register (+ first device key) | 292,648 | 0.0293 |
+| Add device, instant (owner + device) | 195,996 | 0.0196 |
+| Start delayed add (owner) | 159,593 | 0.0160 |
+| Start change recovery (owner + device) | 161,916 | 0.0162 |
+| Start recovery reset (recovery) | 134,970 | 0.0135 |
+| Cancel (device) | 141,573 | 0.0142 |
+| Cancel recovery reset (owner + device) | 142,563 | 0.0143 |
+| Finalize delayed add | 124,108 | 0.0124 |
 | Finalize change recovery | 85,261 | 0.0085 |
 
 ## Relayer (off-chain config, enforced by the Connect server, not the contracts)
