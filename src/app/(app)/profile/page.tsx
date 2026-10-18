@@ -4,6 +4,8 @@ import { removePhotoAction, saveFocusAction, saveProfileExtrasAction } from "@/a
 import { UserAvatar } from "@/components/avatar";
 import { ProofBadges } from "@/components/badges";
 import { MeraLinkWallet } from "@/components/mera-sign-in";
+import { ConnectIdPanel } from "@/components/connect-id-panel";
+import { protocolEnabled } from "@/lib/protocol/env-check";
 import { PhotoPicker } from "@/components/photo-picker";
 import { VerifiedOnMonad } from "@/components/wallet-badge";
 import { Columns, PageHeader } from "@/components/layout";
@@ -120,6 +122,7 @@ export default async function EditProfilePage({ searchParams }: { searchParams: 
             </>
           )}
         </section>
+        {protocolEnabled() && user.walletVerified && user.walletAddress && <ConnectIdPanel />}
         <section className="card p-4">
           <h2 className="mb-1 font-bold">{t(locale, "proof.title")}</h2>
           <p className="mb-3 text-sm text-faint">{t(locale, "profile.verifyHint")}</p>

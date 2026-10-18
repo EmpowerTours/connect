@@ -588,3 +588,54 @@ model GraphEvent {
   @@index([subject])
   @@index([action])
 }
+
+/// Why an account may get sponsored protocol gas (design section 6): it joined through an
+/// invite link, or passed a one-time phone or email check. No row = the member self-pays.
+model ProtocolSponsorship {
+  userId    String   @id
+  /// "invite" or "verified"
+  source    String
+  /// For invite signups: the inviter's user id (limited to 20 sponsored signups a day).
+  inviterId String?
+  createdAt DateTime @default(now())
+}
+
+/// Ledger of every transaction the protocol relayer committed to pay for. The daily cap and the
+/// per-account, per-IP and per-inviter limits are counted from here. costWei is the reserved
+/// worst case (gas limit x max fee) until the receipt replaces it with the charged amount.
+model ProtocolRelay {
+  id        String   @id @default(cuid())
+  chainId   Int
+  userId    String
+  /// "register" or "action"
+  type      String
+  /// Gateway function: register, addKey, suspendKey, retireKey, start, cancel, finalize
+  fn        String
+  /// "invite" or "verified"
+  sponsor   String
+  inviterId String?
+  /// HMAC of the client IP (raw IPs are not stored).
+  ipHash    String?
+  /// Lowercased owner wallet the request was signed for.
+  owner     String
+  /// Connect ID (decimal) for actions; set after a registration confirms.
+  connectId String?
+  /// Key added or targeted, so the app can list this ID's keys before the indexer exists.
+  keyHash   String?
+  /// Public key bytes for key additions (never a private key).
+  keyBytes  String?
+  gasLimit  Decimal  @db.Decimal(78, 0)
+  costWei   Decimal  @db.Decimal(78, 0)
+  /// reserved | sent | confirmed | reverted | failed
+  status    String
+  txHash    String?  @unique
+  error     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([chainId, createdAt])
+  @@index([userId, createdAt])
+  @@index([ipHash, createdAt])
+  @@index([inviterId, createdAt])
+  @@index([chainId, connectId])
+}

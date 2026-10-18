@@ -21,7 +21,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate \
  && npx next build \
- && npx esbuild prisma/seed.ts --bundle --platform=node --format=cjs --external:@prisma/client --outfile=/app/seed.cjs
+ && npx esbuild prisma/seed.ts --bundle --platform=node --format=cjs --external:@prisma/client --outfile=/app/seed.cjs \
+ && npx esbuild relayer/server.ts --bundle --platform=node --format=cjs --external:@prisma/client --outfile=/app/relayer.cjs
 
 # Prisma CLI only (no dev dependencies), pinned to the same version as @prisma/client.
 FROM base AS prisma-cli
@@ -46,6 +47,11 @@ COPY --from=build --chown=connect /app/public ./public
 COPY --from=build --chown=connect /app/prisma/schema.prisma ./prisma/schema.prisma
 COPY --from=build --chown=connect /app/prisma/migrations ./prisma/migrations
 COPY --from=build --chown=connect /app/seed.cjs ./seed.cjs
+# Connect protocol contract addresses by chain (src/lib/protocol/deployments.ts); public data only.
+COPY --from=build --chown=connect /app/deployments ./deployments
+# Protocol relayer: same image, separate Railway service started with `node relayer.cjs`
+# (relayer/server.ts). Only that service gets the relayer key.
+COPY --from=build --chown=connect /app/relayer.cjs ./relayer.cjs
 COPY --from=prisma-cli --chown=connect /prisma-cli ./prisma-cli
 COPY --chown=connect scripts/start.mjs ./start.mjs
 USER connect

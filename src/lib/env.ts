@@ -8,6 +8,7 @@ import { adminWallets } from "./admin";
 import { parseSentryDsn } from "./error-report";
 import { logger } from "./log";
 import { s3ConfigFromEnv } from "./storage";
+import { checkProtocolEnv } from "./protocol/env-check";
 
 export interface EnvReport {
   errors: string[];
@@ -58,6 +59,10 @@ export function checkProductionEnv(env: Env, built: { rpId?: string } = {}): Env
 
   if (env.CRON_SECRET && env.CRON_SECRET.length < 32) warnings.push("CRON_SECRET is shorter than 32 characters, so /api/cron/ingest stays off");
   if (env.SENTRY_DSN && !parseSentryDsn(env.SENTRY_DSN)) warnings.push("SENTRY_DSN is set but is not a valid DSN (https://<key>@<host>/<project id>): errors are only logged");
+  const protocol = checkProtocolEnv(env);
+  errors.push(...protocol.errors);
+  warnings.push(...protocol.warnings);
+
   if (env.ANTHROPIC_API_KEY === undefined && env.OPENAI_API_KEY === undefined) warnings.push("no AI provider key: the scout uses its template drafts");
   return { errors, warnings };
 }

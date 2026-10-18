@@ -278,6 +278,20 @@ export async function signGraphUpdates(): Promise<number> {
   return stored;
 }
 
+/**
+ * One passkey prompt, then `work` gets the Mera account (for Connect ID typed data and, when the
+ * member self-pays, their own transaction). Refuses if the passkey opens a different wallet than
+ * the signed-in one. The key material is zeroed when `work` finishes.
+ */
+export async function withPasskeySigner<T>(expectedWallet: string, work: (account: LocalAccount) => Promise<T>): Promise<T> {
+  let out: T | undefined;
+  await withAccount(signInAccount, async (p) => {
+    if (p.account.address.toLowerCase() !== expectedWallet.toLowerCase()) throw new Error("This passkey opens a different wallet than the one on your profile.");
+    out = await work(p.account);
+  });
+  return out as T;
+}
+
 export function explainPasskeyError(err: unknown): string {
   if (err instanceof CeremonyTimeout) return "Nothing answered the passkey request. Try again on the device that holds your passkey.";
   if (isMeraError(err)) {
