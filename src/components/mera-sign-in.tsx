@@ -33,9 +33,10 @@ function useMeraAction(onDone: () => void) {
 }
 
 /** Sign in / sign up with a Mera passkey wallet. The only wallet this app supports. */
-export function MeraSignIn({ locale, next = null }: { locale: Locale; next?: string | null }) {
+export function MeraSignIn({ locale, next = null, join = false }: { locale: Locale; next?: string | null; join?: boolean }) {
   const router = useRouter();
-  const [creating, setCreating] = useState(false);
+  // Sign-up prompts on public pages link here with ?join=1: open the create form right away.
+  const [creating, setCreating] = useState(join);
   const [name, setName] = useState("");
   const { busy, error, run } = useMeraAction(() => {
     // Re-checked here too: the prop is server-validated, this keeps the component safe on its own.

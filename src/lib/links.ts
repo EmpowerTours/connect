@@ -99,8 +99,12 @@ export function safeNextPath(raw: unknown): string | null {
   return `${p}${url.search}${url.hash}`;
 }
 
-/** `/login`, carrying the page to come back to when there is one worth keeping. */
-export function loginPath(next: string | null | undefined): string {
+/**
+ * `/login`, carrying the page to come back to when there is one worth keeping. `join` opens the
+ * create-account form straight away (sign-up prompts on public pages).
+ */
+export function loginPath(next: string | null | undefined, opts: { join?: boolean } = {}): string {
   const safe = safeNextPath(next);
-  return safe ? `/login?next=${encodeURIComponent(safe)}` : "/login";
+  const q = [opts.join ? "join=1" : "", safe ? `next=${encodeURIComponent(safe)}` : ""].filter(Boolean).join("&");
+  return q ? `/login?${q}` : "/login";
 }
