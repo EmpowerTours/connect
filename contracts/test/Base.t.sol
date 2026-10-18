@@ -148,8 +148,26 @@ abstract contract Base is Test {
         a.expiresAt = exp();
     }
 
+    /// @dev Digest under the owner's nonce (Owner, OwnerDevice).
     function digestOf(ConnectGateway.Action memory a) internal view returns (bytes32) {
         return gw.actionDigest(a, gw.nonceOf(a.id));
+    }
+
+    function digestRecovery(ConnectGateway.Action memory a) internal view returns (bytes32) {
+        return gw.actionDigest(a, gw.recoveryNonceOf(a.id));
+    }
+
+    /// @dev Digest under a device's own nonce (Device signer, retire).
+    function digestDevice(ConnectGateway.Action memory a, uint256 devPk) internal view returns (bytes32) {
+        return gw.actionDigest(a, gw.deviceNonceOf(a.id, p256Hash(devPk)));
+    }
+
+    function nonceFor(uint64 id, ConnectGateway.Signer s) internal view returns (uint64) {
+        return s == ConnectGateway.Signer.Recovery ? gw.recoveryNonceOf(id) : gw.nonceOf(id);
+    }
+
+    function digestFor(ConnectGateway.Action memory a, ConnectGateway.Signer s) internal view returns (bytes32) {
+        return s == ConnectGateway.Signer.Recovery ? digestRecovery(a) : digestOf(a);
     }
 
     function devSig(uint256 devPk, bytes32 digest) internal pure returns (ConnectGateway.DeviceSig memory d) {
@@ -167,7 +185,7 @@ abstract contract Base is Test {
         view
         returns (ConnectGateway.Auth memory)
     {
-        return ConnectGateway.Auth(ConnectGateway.Signer.Recovery, ecdsa(pk, digestOf(a)), noDevice());
+        return ConnectGateway.Auth(ConnectGateway.Signer.Recovery, ecdsa(pk, digestRecovery(a)), noDevice());
     }
 
     function authOD(uint256 pk, uint256 devPk, ConnectGateway.Action memory a)
@@ -184,7 +202,7 @@ abstract contract Base is Test {
         view
         returns (ConnectGateway.Auth memory)
     {
-        return ConnectGateway.Auth(ConnectGateway.Signer.Device, "", devSig(devPk, digestOf(a)));
+        return ConnectGateway.Auth(ConnectGateway.Signer.Device, "", devSig(devPk, digestDevice(a, devPk)));
     }
 
     function opFor(ConnectGateway.Action memory a, ConnectGateway.Signer tier, uint64 nonce)
@@ -211,8 +229,8 @@ abstract contract Base is Test {
         internal
         returns (ConnectGateway.Op memory op)
     {
-        uint64 nonce = gw.nonceOf(a.id);
-        bytes memory consent = consentPk == 0 ? bytes("") : ecdsa(consentPk, digestOf(a));
+        uint64 nonce = nonceFor(a.id, auth.signer);
+        bytes memory consent = consentPk == 0 ? bytes("") : ecdsa(consentPk, digestFor(a, auth.signer));
         bytes32 opId = gw.start(a, auth, key, consent);
         op = opFor(a, auth.signer, nonce);
         assertEq(opId, gw.opIdOf(op), "opId");

@@ -27,7 +27,7 @@ contract ConnectKeyRegistry {
         Removed
     }
 
-    /// @dev One storage slot.
+    /// @dev One storage slot (25 bytes).
     struct Key {
         uint8 keyType;
         uint8 scope;
@@ -35,6 +35,7 @@ contract ConnectKeyRegistry {
         uint40 expiresAt;
         uint40 addedAt;
         uint32 epoch;
+        uint64 nonce; // this device's own action nonce (device-only cancels, retire)
     }
 
     struct IdKeys {
@@ -113,8 +114,13 @@ contract ConnectKeyRegistry {
         current = k.state != State.None && k.epoch == idKeys[id].epoch;
     }
 
+    /// @notice Nonce for actions signed by this device alone.
+    function nonceOf(uint64 id, bytes32 keyHash) external view returns (uint64) {
+        return _keys[id][keyHash].nonce;
+    }
+
     /// @notice Effective state: stale (pre-reset) keys report Suspended.
-    function stateOf(uint64 id, bytes32 keyHash) public view returns (State) {
+    function stateOf(uint64 id, bytes32 keyHash) external view returns (State) {
         Key storage k = _keys[id][keyHash];
         State s = k.state;
         if (s == State.Active && k.epoch != idKeys[id].epoch) return State.Suspended;
@@ -138,7 +144,7 @@ contract ConnectKeyRegistry {
     }
 
     /// @notice Current-epoch key that is Active or Suspended (expiry ignored).
-    function isLive(uint64 id, bytes32 keyHash) public view returns (bool) {
+    function isLive(uint64 id, bytes32 keyHash) external view returns (bool) {
         Key storage k = _keys[id][keyHash];
         State s = k.state;
         return (s == State.Active || s == State.Suspended) && k.epoch == idKeys[id].epoch;
@@ -166,20 +172,19 @@ contract ConnectKeyRegistry {
 
     // ------------------------------------------------------------ mutations
 
-    function add(uint64 id, uint8 keyType, bytes calldata key, uint8 scope, uint40 expiresAt)
-        external
-        onlyGateway
-        returns (bytes32 keyHash)
-    {
-        keyHash = checkAdd(id, keyType, key, scope, expiresAt);
+    function add(uint64 id, uint8 keyType, bytes calldata key, uint8 scope, uint40 expiresAt) external onlyGateway {
+        bytes32 keyHash = checkAdd(id, keyType, key, scope, expiresAt);
         IdKeys storage ik = idKeys[id];
+        Key storage k = _keys[id][keyHash];
+        // A re-added (stale) key keeps its nonce so its old signatures can't be replayed.
         _keys[id][keyHash] = Key({
             keyType: keyType,
             scope: scope,
             state: State.Active,
             expiresAt: expiresAt,
             addedAt: uint40(block.timestamp),
-            epoch: ik.epoch
+            epoch: ik.epoch,
+            nonce: k.nonce
         });
         unchecked {
             ik.live += 1;
@@ -224,6 +229,15 @@ contract ConnectKeyRegistry {
         }
         k.state = State.Removed;
         emit KeyRemoved(id, keyHash);
+    }
+
+    /// @notice Returns and consumes the device's nonce.
+    function useNonce(uint64 id, bytes32 keyHash) external onlyGateway returns (uint64 n) {
+        Key storage k = _keys[id][keyHash];
+        n = k.nonce;
+        unchecked {
+            k.nonce = n + 1;
+        }
     }
 
     /// @notice Makes every key of `id` stale in O(1).

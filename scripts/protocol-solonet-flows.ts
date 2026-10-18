@@ -170,11 +170,19 @@ async function main() {
     deadline: BigInt((await now()) + 3600),
     ...extra,
   });
-  const message = async (a: Action) => ({ ...a, nonce: await read<bigint>("nonceOf", [a.id]) });
-  const digestOf = async (a: Action) => hashTypedData({ domain, types: actionTypes, primaryType: "Action", message: await message(a) });
+  // Nonces are per party: the owner's (owner and owner + device actions) or the device's own (device-only actions).
+  const message = async (a: Action, device?: Device) => ({
+    ...a,
+    nonce: device ? await read<bigint>("deviceNonceOf", [a.id, device.hash]) : await read<bigint>("nonceOf", [a.id]),
+  });
+  const digestOf = async (a: Action, device?: Device) =>
+    hashTypedData({ domain, types: actionTypes, primaryType: "Action", message: await message(a, device) });
   const ownerSig = async (a: Action) => owner.signTypedData({ domain, types: actionTypes, primaryType: "Action", message: await message(a) });
   const noDevice = { keyType: 0, key: "0x" as Hex, sig: "0x" as Hex };
+  /** Co-signature with the owner (owner nonce). */
   const devSig = async (d: Device, a: Action) => ({ keyType: 1, key: d.key, sig: await deviceSign(d, await digestOf(a)) });
+  /** Device acting alone (its own nonce). */
+  const devSoloSig = async (d: Device, a: Action) => ({ keyType: 1, key: d.key, sig: await deviceSign(d, await digestOf(a, d)) });
   const opOf = (a: Action, tier: number, nonce: bigint): Op => ({
     id: a.id, kind: a.kind, tier, account: a.account, keyType: a.keyType, keyHash: a.keyHash, scope: a.scope, expiresAt: a.expiresAt, flag: a.flag, nonce,
   });
@@ -229,7 +237,7 @@ async function main() {
   await send("start delayed addKey (owner)", "start", [a, { signer: Signer.Owner, sig: await ownerSig(a), device: noDevice }, miniApp.key, "0x"]);
   const cancelled = opOf(a, Signer.Owner, nonce);
   const c = await action(id, Kind.Cancel, { opId: await read<Hex>("opIdOf", [cancelled]) });
-  await send("cancel (device)", "cancel", [c, { signer: Signer.Device, sig: "0x", device: await devSig(laptop, c) }, cancelled]);
+  await send("cancel (device)", "cancel", [c, { signer: Signer.Device, sig: "0x", device: await devSoloSig(laptop, c) }, cancelled]);
 
   // 4. delayed add (owner alone) + 5. change recovery on the long path (owner + device), then finalize both.
   a = await action(id, Kind.AddKey, { keyType: 1, keyHash: tablet.hash, scope: ALL, expiresAt });

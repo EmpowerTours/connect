@@ -78,7 +78,7 @@ contract ConnectGatewayFuzzTest is Base {
         } else if (tier == ConnectGateway.Signer.Recovery) {
             expected = by == ConnectGateway.Signer.OwnerDevice;
         }
-        if (removal && usesDevice && deviceIsTarget) expected = false;
+        if (removal && usesDevice && deviceIsTarget && tier != ConnectGateway.Signer.Owner) expected = false;
         // The owner alone can never cancel what the member did with a device or recovery.
         if (by == ConnectGateway.Signer.Owner && tier != ConnectGateway.Signer.Owner) assertFalse(expected);
         assertEq(gw.canCancel(op, by, deviceHash), expected);
@@ -102,7 +102,8 @@ contract ConnectGatewayFuzzTest is Base {
         bytes memory sig = signRegister(ownerPk, p);
         bool scopeOk = scope != 0 && scope & ~uint8(63) == 0;
         bool expOk = life > 0 && life <= 730 days;
-        if (!scopeOk) vm.expectRevert(ConnectKeyRegistry.BadScope.selector);
+        if (scope & GUARD == 0) vm.expectRevert(ConnectGateway.FirstKeyNotGuard.selector);
+        else if (!scopeOk) vm.expectRevert(ConnectKeyRegistry.BadScope.selector);
         else if (!expOk) vm.expectRevert(ConnectKeyRegistry.BadExpiry.selector);
         gw.register(p, sig);
     }

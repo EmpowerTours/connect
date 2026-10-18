@@ -24,6 +24,9 @@ contract StolenOwnerInvariantTest is Base {
 
         handler = new StolenOwnerHandler(gw, id, reset, ownerPk);
         targetContract(address(handler));
+        bytes4[] memory skip = new bytes4[](1);
+        skip[0] = handler.setUp.selector; // no-op in the handler; don't waste calls on it
+        excludeSelector(FuzzSelector({addr: address(handler), selectors: skip}));
     }
 
     /// The ID is only ever owned by the original (stolen) wallet or the member's new one.
@@ -42,7 +45,7 @@ contract StolenOwnerInvariantTest is Base {
     function invariant_resetAlive() public view {
         if (ids.ownerOf(id) == newOwner) return;
         (uint40 readyAt, uint32 opEpoch) = gw.pending(gw.opIdOf(reset));
-        (, uint32 cur,,,) = gw.idState(id);
+        (,, uint32 cur,,,) = gw.idState(id);
         assertTrue(readyAt != 0, "reset gone");
         assertEq(opEpoch, cur, "reset stale");
     }

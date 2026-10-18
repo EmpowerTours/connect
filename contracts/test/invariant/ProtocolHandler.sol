@@ -88,8 +88,8 @@ contract ProtocolHandler is Base {
             if (kind != ConnectGateway.Kind.AddKey) key = "";
         }
         ConnectGateway.Auth memory auth = _auth(who, seed >> 8, a);
-        uint64 nonce = gw.nonceOf(id);
-        bytes memory consent = consentPk == 0 ? bytes("") : ecdsa(consentPk, digestOf(a));
+        uint64 nonce = nonceFor(id, auth.signer);
+        bytes memory consent = consentPk == 0 ? bytes("") : ecdsa(consentPk, digestFor(a, auth.signer));
         try gw.start(a, auth, key, consent) {
             if (auth.signer == ConnectGateway.Signer.Device) ghostDeviceStarts++;
             ops.push(Tracked(opFor(a, auth.signer, nonce), key, block.timestamp, true));
@@ -145,7 +145,7 @@ contract ProtocolHandler is Base {
     function retire(uint256 seed) external {
         uint256 dpk = _dev(seed);
         ConnectGateway.Action memory a = actKey(id, ConnectGateway.Kind.RetireKey, dpk);
-        try gw.retireKey(a, devSig(dpk, digestOf(a))) {} catch {}
+        try gw.retireKey(a, devSig(dpk, digestDevice(a, dpk))) {} catch {}
     }
 
     function prune(uint256 idx) external {
@@ -166,8 +166,10 @@ contract ProtocolHandler is Base {
     /// @dev First open op at or after idx (wrapping), so calls are rarely wasted.
     function _pickOpen(uint256 idx) internal view returns (bool, uint256) {
         uint256 n = ops.length;
+        if (n == 0) return (false, 0);
+        uint256 start = idx % n;
         for (uint256 k; k < n; k++) {
-            uint256 j = (idx + k) % n;
+            uint256 j = (start + k) % n;
             if (ops[j].open) return (true, j);
         }
         return (false, 0);
@@ -186,7 +188,9 @@ contract ProtocolHandler is Base {
         pure
         returns (bool)
     {
-        if (op.kind == ConnectGateway.Kind.RemoveKey && deviceHash == op.keyHash) return false;
+        if (op.kind == ConnectGateway.Kind.RemoveKey && deviceHash == op.keyHash && op.tier != ConnectGateway.Signer.Owner) {
+            return false;
+        }
         if (op.tier == ConnectGateway.Signer.Recovery) return by == ConnectGateway.Signer.OwnerDevice;
         if (op.tier == ConnectGateway.Signer.OwnerDevice) return by != ConnectGateway.Signer.Owner;
         return true;

@@ -17,6 +17,9 @@ contract ProtocolInvariantTest is Base {
         gw.addKey(a, authOD(ownerPk, phonePk, a), p256Key(laptopPk));
         handler = new ProtocolHandler(gw, id, ownerPk, recoveryPk);
         targetContract(address(handler));
+        bytes4[] memory skip = new bytes4[](1);
+        skip[0] = handler.setUp.selector; // no-op in the handler; don't waste calls on it
+        excludeSelector(FuzzSelector({addr: address(handler), selectors: skip}));
     }
 
     /// No path finalizes before its delay (3 days, or 7 for transfer/recovery change).
@@ -48,7 +51,7 @@ contract ProtocolInvariantTest is Base {
     }
 
     function invariant_pendingPerTierBounded() public view {
-        (,, uint8 a, uint8 b, uint8 c) = gw.idState(id);
+        (,,, uint8 a, uint8 b, uint8 c) = gw.idState(id);
         assertLe(a, 5);
         assertLe(b, 5);
         assertLe(c, 5);

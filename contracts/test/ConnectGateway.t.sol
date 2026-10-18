@@ -91,9 +91,15 @@ contract ConnectGatewayTest is Base {
         vm.expectRevert(ConnectKeyRegistry.BadKey.selector);
         gw.register(p, sig);
 
-        p = regParams(owner, recovery, phonePk, 64);
+        p = regParams(owner, recovery, phonePk, 64 | GUARD);
         sig = signRegister(ownerPk, p);
         vm.expectRevert(ConnectKeyRegistry.BadScope.selector);
+        gw.register(p, sig);
+
+        // the first key is the member's own device and must carry GUARD
+        p = regParams(owner, recovery, phonePk, MESSAGES);
+        sig = signRegister(ownerPk, p);
+        vm.expectRevert(ConnectGateway.FirstKeyNotGuard.selector);
         gw.register(p, sig);
 
         p = regParams(owner, recovery, phonePk, ALL);
@@ -246,7 +252,7 @@ contract ConnectGatewayTest is Base {
     function test_retire_deviceSelf() public {
         uint64 id = registerDefault();
         ConnectGateway.Action memory a = actKey(id, RETIRE, phonePk);
-        gw.retireKey(a, devSig(phonePk, digestOf(a)));
+        gw.retireKey(a, devSig(phonePk, digestDevice(a, phonePk)));
         assertEq(uint8(keys.stateOf(id, p256Hash(phonePk))), uint8(ConnectKeyRegistry.State.Retired));
         assertFalse(keys.hasGuardPower(id, p256Hash(phonePk)));
         (, uint8 live) = keys.idKeys(id);
@@ -256,7 +262,7 @@ contract ConnectGatewayTest is Base {
     function test_retire_cannotRetireAnotherKey() public {
         uint64 id = registerDefault();
         ConnectGateway.Action memory a = actKey(id, RETIRE, phonePk);
-        ConnectGateway.DeviceSig memory d = devSig(laptopPk, digestOf(a));
+        ConnectGateway.DeviceSig memory d = devSig(laptopPk, digestDevice(a, laptopPk));
         vm.expectRevert(ConnectGateway.KeyMismatch.selector);
         gw.retireKey(a, d);
     }
@@ -264,7 +270,7 @@ contract ConnectGatewayTest is Base {
     function test_retire_retiredKeyCannotBeReadded() public {
         uint64 id = registerDefault();
         ConnectGateway.Action memory a = actKey(id, RETIRE, phonePk);
-        gw.retireKey(a, devSig(phonePk, digestOf(a)));
+        gw.retireKey(a, devSig(phonePk, digestDevice(a, phonePk)));
         a = actAdd(id, phonePk, ALL);
         ConnectGateway.Auth memory auth = authOwner(ownerPk, a);
         bytes memory key = p256Key(phonePk);
@@ -471,7 +477,7 @@ contract ConnectGatewayTest is Base {
         vm.expectRevert(ConnectGateway.OpExpired.selector);
         gw.finalize(op, p256Key(laptopPk));
         gw.prune(op);
-        (,, uint8 pOwner,,) = gw.idState(id);
+        (,,, uint8 pOwner,,) = gw.idState(id);
         assertEq(pOwner, 0);
     }
 
@@ -534,7 +540,7 @@ contract ConnectGatewayTest is Base {
         c = cancelAct(id, op);
         gw.cancel(c, authOD(ownerPk, phonePk, c), op);
         assertFalse(isPending(op));
-        (,, uint8 pOwner,,) = gw.idState(id);
+        (,,, uint8 pOwner,,) = gw.idState(id);
         assertEq(pOwner, 0);
     }
 
@@ -576,14 +582,26 @@ contract ConnectGatewayTest is Base {
         assertFalse(isPending(op));
     }
 
-    function test_cancel_deviceCannotCancelOwnRemoval() public {
+    /// Owner + another device removing a key: the target can't veto it.
+    function test_cancel_deviceCannotCancelOwnOwnerDeviceRemoval() public {
         uint64 id = _setupWithLaptop();
         ConnectGateway.Action memory a = actKey(id, REMOVE, laptopPk);
-        ConnectGateway.Op memory op = startOp(a, authOwner(ownerPk, a), "", 0);
+        ConnectGateway.Op memory op = startOp(a, authOD(ownerPk, phonePk, a), "", 0);
         ConnectGateway.Action memory c = cancelAct(id, op);
         ConnectGateway.Auth memory auth = authDevice(laptopPk, c);
         vm.expectRevert(ConnectGateway.CannotCancel.selector);
         gw.cancel(c, auth, op);
+        gw.cancel(c, authDevice(phonePk, c), op);
+        assertFalse(isPending(op));
+    }
+
+    /// Audit M-1: a single-device member must survive a stolen Mera key, so a
+    /// device can cancel its own removal when the owner alone started it.
+    function test_cancel_singleDeviceSurvivesOwnerOnlyRemoval() public {
+        uint64 id = registerDefault(); // phone is the only device
+        ConnectGateway.Action memory a = actKey(id, REMOVE, phonePk);
+        ConnectGateway.Op memory op = startOp(a, authOwner(ownerPk, a), "", 0);
+        ConnectGateway.Action memory c = cancelAct(id, op);
         gw.cancel(c, authDevice(phonePk, c), op);
         assertFalse(isPending(op));
     }
@@ -709,7 +727,7 @@ contract ConnectGatewayTest is Base {
         ConnectGateway.Action memory a = actKey(id, SUSPEND, laptopPk);
         gw.suspendKey(a, authOwner(ownerPk, a));
         a = actKey(id, RETIRE, laptopPk);
-        gw.retireKey(a, devSig(laptopPk, digestOf(a)));
+        gw.retireKey(a, devSig(laptopPk, digestDevice(a, laptopPk)));
         ConnectGateway.Op memory reset = _resetOp(id);
         vm.warp(block.timestamp + delay);
         gw.finalize(reset, "");

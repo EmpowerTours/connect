@@ -13,15 +13,19 @@ contracts, no owner, no upgrade path:
 
 - **Delays:** 7 days for transfer ownership and change recovery; 3 days for delayed key
   operations and the recovery reset. Anyone can finalize within 30 days after `readyAt`.
-- **Instant:** register (owner signature, the relayer can submit); owner + GUARD device adds a
-  key; owner suspends a key; a device retires itself.
+- **Instant:** register (owner signature, the relayer can submit; the first key must have GUARD);
+  owner + GUARD device adds a key; owner suspends a key; a device retires itself.
+- **Nonces per party:** the owner (also used for owner + device actions), the recovery address
+  and each device have their own nonce. No party can invalidate another party's signed
+  actions.
 - **Device keys never start a change.** GUARD keys can cancel and co-sign, and keep those
   powers while suspended (so a thief holding the Mera key can't lock the member out).
 - **Cancel matrix:**
   - owner-only ops: the owner, the recovery address or any GUARD device;
   - owner + device ops: recovery, any GUARD device, or owner + device, but not the owner alone;
   - the recovery reset: owner + device only;
-  - a device never cancels its own removal.
+  - a device can't cancel its own removal when owner + another device started it; it can
+    cancel an owner-only removal, so a single-device member survives a stolen Mera key.
 - **Pending ops:** max 5 per signer tier, so a thief with one key can't fill the member's slots.
   Transfer, reset and recovery change invalidate every other pending op of that ID.
 - **Pause:** the guardian, a Safe, can pause registration and key additions for at most 14 days,
@@ -46,7 +50,7 @@ exist on testnet or mainnet, even from an edited script.
 ```bash
 git submodule update --init contracts/lib/forge-std contracts/lib/openzeppelin-contracts
 cd contracts
-forge test                      # unit, fuzz (512 runs) and invariant (128 runs × depth 120)
+forge test                      # unit, fuzz (512 runs), attack tests, invariants (128 runs × depth 120)
 FOUNDRY_PROFILE=deep forge test # fuzz 20k runs, invariants 512 × 300
 forge snapshot                  # gas snapshot (.gas-snapshot)
 ```
@@ -74,20 +78,28 @@ Env: `TESTNET_RPC` (default `https://testnet-rpc.monad.xyz`), `GUARDIAN` (defaul
 testnet; the 2-of-3 Safe on mainnet), `GAS_MULT` (default 110), `DEV_DELAY` / `DEV_LONG_DELAY`
 (Solonet only).
 
+### Testnet funding
+
+Fund about **3 MON for the deployer**: one deploy costs ≈ 0.66 MON, and the budget covers 3.
+Fund about **38 MON for the relayer** over the 3+ week test: 50 members, scripted QA three
+times a day and stolen-key drills, plus 25% headroom. The math is in
+`connect-monad-protocol.md` §12. Faucets: https://faucet.monad.xyz (1 claim per 12 h,
+0.05–5 MON depending on eligibility) and Alchemy (1 MON per 24 h).
+
 ### Gas measured on Solonet
 
 Solonet runs the Monad gas schedule (MIP-8 storage pages, limit-charged). At a 100 gwei base fee:
 
 | Step | Gas charged (limit = estimate × 1.10) | MON |
 |---|---:|---:|
-| Deploy (gateway + 2 registries) | 6,003,852 | 0.600 |
-| Register (+ first device key) | 291,875 | 0.0292 |
-| Add device, instant (owner + device) | 195,369 | 0.0195 |
-| Start delayed add (owner) | 159,866 | 0.0160 |
-| Start change recovery (owner + device) | 162,179 | 0.0162 |
-| Cancel (device) | 134,347 | 0.0134 |
-| Finalize delayed add | 123,470 | 0.0123 |
-| Finalize change recovery | 85,258 | 0.0085 |
+| Deploy (gateway + 2 registries) | 6,427,634 | 0.643 |
+| Register (+ first device key) | 292,635 | 0.0293 |
+| Add device, instant (owner + device) | 196,010 | 0.0196 |
+| Start delayed add (owner) | 159,606 | 0.0160 |
+| Start change recovery (owner + device) | 161,929 | 0.0162 |
+| Cancel (device) | 141,567 | 0.0142 |
+| Finalize delayed add | 124,121 | 0.0124 |
+| Finalize change recovery | 85,261 | 0.0085 |
 
 ## Relayer (off-chain config, enforced by the Connect server, not the contracts)
 

@@ -36,7 +36,14 @@ import {ConnectKeyRegistry} from "./ConnectKeyRegistry.sol";
 ///                                  (NOT the owner alone: a thief holding only
 ///                                  the Mera key cannot undo the member)
 ///           Recovery reset      -> owner + GUARD device only
-///           A device can never cancel its own removal.
+///           A device can't cancel its own removal when the owner AND
+///           another device started it; it can cancel an owner-only one (so
+///           a single-device member survives a stolen Mera key).
+///
+///         Nonces: one per party (owner, recovery, each device), so no party
+///         can invalidate another party's signed actions by burning a shared
+///         nonce (a thief with the Mera key can't front-run the member's
+///         device cancels or recovery reset).
 ///
 ///         Delays: 7 days for the two permanent-takeover paths (transfer
 ///         ownership, change recovery), 3 days for everything else. The
@@ -118,7 +125,8 @@ contract ConnectGateway is EIP712 {
     }
 
     struct IdState {
-        uint64 nonce;
+        uint64 nonce; // owner and owner + device actions
+        uint64 recoveryNonce; // recovery actions
         uint32 opEpoch; // bumped on owner/recovery change: invalidates pending ops
         uint8 pendingOwner;
         uint8 pendingOwnerDevice;
@@ -143,6 +151,11 @@ contract ConnectGateway is EIP712 {
     /// @dev Per tier, so a thief holding one key cannot fill the slots the
     ///      member needs (e.g. owner-only ops never block a recovery reset).
     uint8 public constant MAX_PENDING_PER_TIER = 5;
+
+    /// @dev Mirrors ConnectKeyRegistry (constants, so no external call).
+    uint8 internal constant TYPE_P256 = 1;
+    uint8 internal constant TYPE_SECP256K1 = 2;
+    uint8 internal constant SCOPE_GUARD = 32;
 
     uint256 public constant CHAIN_MONAD = 143;
     uint256 public constant CHAIN_MONAD_TESTNET = 10143;
@@ -176,6 +189,7 @@ contract ConnectGateway is EIP712 {
     error IsPaused();
     error NotGuardian();
     error BadPause();
+    error FirstKeyNotGuard();
 
     event OpStarted(bytes32 indexed opId, uint64 indexed id, Op op, uint40 readyAt, bytes key);
     event OpCancelled(bytes32 indexed opId, uint64 indexed id, Signer by);
@@ -233,8 +247,19 @@ contract ConnectGateway is EIP712 {
         return delay != PROD_DELAY || longDelay != PROD_LONG_DELAY;
     }
 
+    /// @notice Nonce for owner and owner + device actions.
     function nonceOf(uint64 id) external view returns (uint64) {
         return idState[id].nonce;
+    }
+
+    /// @notice Nonce for recovery-address actions.
+    function recoveryNonceOf(uint64 id) external view returns (uint64) {
+        return idState[id].recoveryNonce;
+    }
+
+    /// @notice Nonce for actions signed by one device alone.
+    function deviceNonceOf(uint64 id, bytes32 keyHash) external view returns (uint64) {
+        return keyRegistry.nonceOf(id, keyHash);
     }
 
     function domainSeparator() external view returns (bytes32) {
@@ -292,7 +317,10 @@ contract ConnectGateway is EIP712 {
     /// @notice The cancel matrix. `deviceHash` is the device that signed the
     ///         cancel (zero if none).
     function canCancel(Op memory op, Signer by, bytes32 deviceHash) public pure returns (bool) {
-        if (deviceHash != bytes32(0) && op.kind == Kind.RemoveKey && deviceHash == op.keyHash) return false;
+        if (
+            deviceHash != bytes32(0) && op.kind == Kind.RemoveKey && deviceHash == op.keyHash
+                && op.tier != Signer.Owner
+        ) return false;
         if (op.tier == Signer.Recovery) return by == Signer.OwnerDevice;
         if (op.tier == Signer.OwnerDevice) {
             return by == Signer.Recovery || by == Signer.Device || by == Signer.OwnerDevice;
@@ -310,6 +338,8 @@ contract ConnectGateway is EIP712 {
         returns (uint64 id)
     {
         if (block.timestamp > p.deadline) revert Expired();
+        // The first key is the member's own device; it must be able to cancel.
+        if (p.scope & SCOPE_GUARD == 0) revert FirstKeyNotGuard();
         uint256 nonce = registerNonce[p.owner];
         if (!_isValidSig(p.owner, registerDigest(p, nonce), ownerSig)) revert BadSignature();
         unchecked {
@@ -342,9 +372,11 @@ contract ConnectGateway is EIP712 {
     /// @notice A device key retires itself (lost trust, app uninstall).
     function retireKey(Action calldata a, DeviceSig calldata device) external {
         if (a.kind != Kind.RetireKey) revert BadKind();
-        bytes32 digest = _consumeNonce(a);
-        bytes32 h = _verifyDevice(digest, device);
+        if (block.timestamp > a.deadline) revert Expired();
+        bytes32 h = keyRegistry.keyHashOf(device.keyType, device.key);
         if (h != a.keyHash) revert KeyMismatch();
+        bytes32 digest = actionDigest(a, keyRegistry.useNonce(a.id, h));
+        if (_verifyDevice(digest, device) != h) revert KeyMismatch();
         keyRegistry.retire(a.id, h);
     }
 
@@ -360,8 +392,7 @@ contract ConnectGateway is EIP712 {
         Signer s = auth.signer;
         if (s != Signer.Owner && s != Signer.OwnerDevice && s != Signer.Recovery) revert BadSigner();
         (address owner, address recovery) = idRegistry.recordOf(a.id);
-        uint64 nonce = idState[a.id].nonce;
-        bytes32 digest = _authorize(a, auth);
+        (bytes32 digest, uint64 nonce) = _authorize(a, auth);
         Kind k = a.kind;
 
         if (k == Kind.RecoveryReset) {
@@ -444,15 +475,17 @@ contract ConnectGateway is EIP712 {
         IdState storage st = idState[op.id];
         if (p.opEpoch != st.opEpoch) revert OpStale();
         _clear(opId, op, p);
+        emit OpFinalized(opId, op.id);
 
+        // Effects on this contract first; the registries are trusted and non-reentrant by design.
         Kind k = op.kind;
         if (k == Kind.TransferOwner || k == Kind.RecoveryReset) {
+            _invalidateOps(st, op.id);
             idRegistry.setOwner(op.id, op.account);
             if (k == Kind.RecoveryReset && op.flag) keyRegistry.resetKeys(op.id);
-            _invalidateOps(st, op.id);
         } else if (k == Kind.ChangeRecovery) {
-            idRegistry.setRecovery(op.id, op.account);
             _invalidateOps(st, op.id);
+            idRegistry.setRecovery(op.id, op.account);
         } else if (k == Kind.AddKey) {
             if (keyRegistry.keyHashOf(op.keyType, key) != op.keyHash) revert KeyMismatch();
             keyRegistry.add(op.id, op.keyType, key, op.scope, op.expiresAt);
@@ -462,7 +495,6 @@ contract ConnectGateway is EIP712 {
             // UnsuspendKey (start() admits no other kinds)
             keyRegistry.unsuspend(op.id, op.keyHash);
         }
-        emit OpFinalized(opId, op.id);
     }
 
     /// @notice Anyone can clear an op that expired or went stale.
@@ -508,27 +540,33 @@ contract ConnectGateway is EIP712 {
         return block.chainid == CHAIN_ANVIL || block.chainid == CHAIN_SOLONET;
     }
 
-    function _consumeNonce(Action calldata a) private returns (bytes32 digest) {
+    /// @dev Checks the signatures required by `auth.signer` and consumes the
+    ///      nonce of the party that leads the action: the owner (Owner,
+    ///      OwnerDevice), the recovery address, or the device (Device).
+    function _authorize(Action calldata a, Auth calldata auth) private returns (bytes32 digest, uint64 nonce) {
         if (block.timestamp > a.deadline) revert Expired();
-        IdState storage st = idState[a.id];
-        uint64 nonce = st.nonce;
-        digest = actionDigest(a, nonce);
-        unchecked {
-            st.nonce = nonce + 1;
-        }
-    }
-
-    /// @dev Checks the signatures required by `auth.signer` and consumes the nonce.
-    function _authorize(Action calldata a, Auth calldata auth) private returns (bytes32 digest) {
         (address owner, address recovery) = idRegistry.recordOf(a.id);
         if (owner == address(0)) revert UnknownId();
-        digest = _consumeNonce(a);
         Signer s = auth.signer;
+        IdState storage st = idState[a.id];
         if (s == Signer.Owner || s == Signer.OwnerDevice) {
+            nonce = st.nonce;
+            unchecked {
+                st.nonce = nonce + 1;
+            }
+            digest = actionDigest(a, nonce);
             if (!_isValidSig(owner, digest, auth.sig)) revert BadSignature();
         } else if (s == Signer.Recovery) {
+            nonce = st.recoveryNonce;
+            unchecked {
+                st.recoveryNonce = nonce + 1;
+            }
+            digest = actionDigest(a, nonce);
             if (!_isValidSig(recovery, digest, auth.sig)) revert BadSignature();
-        } else if (s != Signer.Device) {
+        } else if (s == Signer.Device) {
+            nonce = keyRegistry.useNonce(a.id, keyRegistry.keyHashOf(auth.device.keyType, auth.device.key));
+            digest = actionDigest(a, nonce);
+        } else {
             revert BadSigner();
         }
         if (s == Signer.OwnerDevice || s == Signer.Device) {
@@ -540,13 +578,13 @@ contract ConnectGateway is EIP712 {
     /// @dev Verifies a device signature over `digest` and returns the key hash.
     ///      Registration status is checked by the caller.
     function _verifyDevice(bytes32 digest, DeviceSig calldata d) private view returns (bytes32 h) {
-        bool ok;
-        if (d.keyType == 1 && d.key.length == 64 && d.sig.length == 64) {
+        bool ok = false;
+        if (d.keyType == TYPE_P256 && d.key.length == 64 && d.sig.length == 64) {
             // WebCrypto ECDSA P-256/SHA-256 over the 32-byte digest.
             (bytes32 x, bytes32 y) = abi.decode(d.key, (bytes32, bytes32));
             (bytes32 r, bytes32 s) = abi.decode(d.sig, (bytes32, bytes32));
             ok = P256.verify(sha256(abi.encodePacked(digest)), r, s, x, y);
-        } else if (d.keyType == 2 && d.key.length == 32) {
+        } else if (d.keyType == TYPE_SECP256K1 && d.key.length == 32) {
             address signer = abi.decode(d.key, (address));
             (address rec, ECDSA.RecoverError err,) = ECDSA.tryRecoverCalldata(digest, d.sig);
             ok = err == ECDSA.RecoverError.NoError && rec == signer && signer != address(0);
