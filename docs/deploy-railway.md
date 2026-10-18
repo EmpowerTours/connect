@@ -78,7 +78,7 @@ Optional:
 - `SENTRY_DSN`: send server errors to Sentry (no SDK; one HTTPS request per error). `LOG_LEVEL`: `debug` / `info` / `warn` / `error`.
 - `CRON_SECRET`: only if an external scheduler should call the ingest endpoint (section 7).
 - `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`: the AI scout. Without one it uses template drafts.
-- `NEYNAR_API_KEY` / `FARCASTER_HUB_URL` / `MONAD_RPC_URL`: importer back ends (see the README).
+- `FARCASTER_HUB_URL` / `MONAD_RPC_URL`: importer back ends, both optional (see the README). The Farcaster import uses public hubs only.
 
 **Never set** `ALLOW_DEV_LOGIN` in production; the boot check refuses it.
 

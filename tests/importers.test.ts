@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_HUB_URL,
   FOLLOW_BUDGET_MS,
   FarcasterUnavailable,
   HubProvider,
   REQUEST_TIMEOUT_MS,
-  NeynarProvider,
   bioToImport,
   getFarcasterProvider,
   isOwnAccount,
@@ -80,29 +80,13 @@ describe("farcaster importer", () => {
     await expect(new HubProvider(down).following(1, 10)).rejects.toThrow("network");
   });
 
-  it("neynar: sends the key, maps custody + verified addresses, follows the cursor", async () => {
-    const { fetcher, calls } = fakeFetch({
-      "bulk-by-address": { [ME]: [{ fid: 9, username: "sofia", display_name: "Sofía", custody_address: "0x3333333333333333333333333333333333333333", verified_addresses: { eth_addresses: [ME] } }] },
-      "following?fid=9&limit=100&cursor=c2": { users: [{ user: { fid: 12 } }], next: { cursor: null } },
-      "following?fid=9": { users: [{ user: { fid: 11 } }, { user: { fid: 12 } }], next: { cursor: "c2" } },
-    });
-    const n = new NeynarProvider(fetcher, "test-key");
-    const [acc] = await n.findByAddresses([ME]);
-    expect(acc.fid).toBe(9);
-    expect(acc.addresses).toContain(ME);
-    expect(await n.following(9, 100)).toEqual([11, 12]);
-    expect(calls[0].headers?.["x-api-key"]).toBe("test-key");
-  });
-
-  it("reads the profile bio from a hub or Neynar and only fills an empty Connect bio", async () => {
+  it("reads the profile bio from the hub and only fills an empty Connect bio", async () => {
     const hub = fakeFetch({
       "userNameProofByName?name=ana": { fid: 42 },
       userDataByFid: { messages: [...userData("ana", "Ana").messages, { data: { userDataBody: { type: "USER_DATA_TYPE_BIO", value: "  BD at Quetzal  " } } }] },
       verificationsByFid: verifications([]),
     });
     expect((await new HubProvider(hub.fetcher, "https://hub.example").findByUsername("ana"))?.bio).toBe("BD at Quetzal");
-    const ny = fakeFetch({ "user/by_username": { user: { fid: 9, username: "sofia", profile: { bio: { text: "Payments\nnerd" } } } } });
-    expect((await new NeynarProvider(ny.fetcher, "k").findByUsername("sofia"))?.bio).toBe("Payments\nnerd");
 
     expect(bioToImport("", { bio: "Payments\n\n nerd" })).toBe("Payments nerd");
     expect(bioToImport("Already written", { bio: "x" })).toBeNull();
@@ -110,27 +94,27 @@ describe("farcaster importer", () => {
     expect([...bioToImport("", { bio: "é".repeat(500) })!].length).toBe(400);
   });
 
-  it("picks Neynar only when a key is set (no key = public hub, no paid API needed)", () => {
-    const { fetcher } = fakeFetch({});
+  it("always uses a public hub: FARCASTER_HUB_URL or the default, no key needed", async () => {
+    const { fetcher, calls } = fakeFetch({ "userNameProofByName?name=ana": { fid: 42 }, userDataByFid: userData("ana", "Ana"), verificationsByFid: verifications([]) });
     expect(getFarcasterProvider({}, fetcher).name).toBe("hub");
-    expect(getFarcasterProvider({ NEYNAR_API_KEY: "k" }, fetcher).name).toBe("neynar");
+    await getFarcasterProvider({ FARCASTER_HUB_URL: "https://hub.example" }, fetcher).findByUsername("ana");
+    await getFarcasterProvider({}, fetcher).findByUsername("ana");
+    expect(calls.map((c) => new URL(c.url).origin)).toEqual(expect.arrayContaining(["https://hub.example", DEFAULT_HUB_URL]));
+    expect(calls.every((c) => !c.headers || Object.keys(c.headers).every((h) => !/key|auth/i.test(h)))).toBe(true);
   });
 
-  it("hub and Neynar: every request carries an abort signal (10 s default)", async () => {
+  it("hub: every request carries an abort signal (10 s default)", async () => {
     expect(REQUEST_TIMEOUT_MS).toBe(10_000);
     expect(FOLLOW_BUDGET_MS).toBe(25_000);
     const signals: (AbortSignal | undefined)[] = [];
     const fetcher: Fetcher = async (url, init) => {
       signals.push(init?.signal);
       if (url.includes("userNameProofByName")) return { ok: true, status: 200, text: async () => JSON.stringify({ fid: 42 }) };
-      if (url.includes("by_username")) return { ok: true, status: 200, text: async () => JSON.stringify({ user: { fid: 9 } }) };
       return { ok: true, status: 200, text: async () => "{}" };
     };
     await new HubProvider(fetcher).findByUsername("ana");
     await new HubProvider(fetcher).following(42, 10);
-    await new NeynarProvider(fetcher, "k").findByUsername("sofia");
-    await new NeynarProvider(fetcher, "k").following(9, 10);
-    expect(signals.length).toBeGreaterThanOrEqual(5);
+    expect(signals.length).toBeGreaterThanOrEqual(3);
     expect(signals.every((s) => s instanceof AbortSignal && !s.aborted)).toBe(true);
   });
 
@@ -145,9 +129,8 @@ describe("farcaster importer", () => {
   it("a request that hangs is aborted and reported as a timeout", async () => {
     const hub = new HubProvider(hanging, "https://hub.example", { requestTimeoutMs: 30 });
     await expect(hub.findByUsername("ana")).rejects.toThrow(new FarcasterUnavailable("timeout"));
-    const neynar = new NeynarProvider(hanging, "k", { requestTimeoutMs: 30 });
-    await expect(neynar.findByAddresses([ME])).rejects.toThrow(new FarcasterUnavailable("timeout"));
-    await expect(neynar.following(9, 10)).rejects.toThrow(new FarcasterUnavailable("timeout"));
+    await expect(hub.findByAddresses([ME])).rejects.toThrow(new FarcasterUnavailable("timeout"));
+    await expect(hub.following(9, 10)).rejects.toThrow(new FarcasterUnavailable("timeout"));
   });
 
   it("a slow body read counts against the same timeout", async () => {
@@ -186,10 +169,10 @@ describe("farcaster importer", () => {
     let calls = 0;
     const fetcher: Fetcher = (url, init) => {
       calls++;
-      if (calls === 1) return Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify({ users: [{ user: { fid: 11 } }], next: { cursor: "c2" } }) });
+      if (calls === 1) return Promise.resolve({ ok: true, status: 200, text: async () => JSON.stringify({ messages: [{ data: { linkBody: { targetFid: 11 } } }], nextPageToken: "p2" }) });
       return hanging(url, init);
     };
-    const res = await new NeynarProvider(fetcher, "k", { requestTimeoutMs: 30 }).followingWithStatus(9, 100);
+    const res = await new HubProvider(fetcher, "https://hub.example", { requestTimeoutMs: 30 }).followingWithStatus(9, 100);
     expect(res).toEqual({ fids: [11], partial: true });
   });
 

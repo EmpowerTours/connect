@@ -14,7 +14,7 @@ export type FarcasterRunResult =
  * One Farcaster import for a member (the /import page and onboarding share it): find the account
  * by username (or by the member's verified wallet), record the link, fill an empty bio from the
  * Farcaster profile, then turn the accounts it follows into pending follow suggestions. Uses the
- * public hub, or Neynar when NEYNAR_API_KEY is set; a source that is down is an error result,
+ * public Farcaster hub (FARCASTER_HUB_URL); a source that is down is an error result,
  * never a thrown error. The caller checks the session and the rate limit.
  */
 export async function runFarcasterImport(

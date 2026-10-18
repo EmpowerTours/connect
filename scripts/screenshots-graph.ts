@@ -324,7 +324,6 @@ async function main() {
       AUTH_SESSION_SECRET: randomBytes(32).toString("hex"),
       ADMIN_WALLETS: keys.admin.address,
       FARCASTER_HUB_URL: MOCK,
-      NEYNAR_API_KEY: "",
       MONAD_RPC_URL: `${MOCK}/rpc`,
       STORAGE_DRIVER: "local",
     },
