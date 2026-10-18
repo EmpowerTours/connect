@@ -10,6 +10,8 @@ import { TabPage } from "@/components/layout";
 import { currentUserIsAdmin, getLocale, requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { t } from "@/lib/i18n";
+import { inviteUrl } from "@/lib/invites";
+import { ensureInviteCode, inviteCount } from "@/lib/invites-db";
 
 export const metadata = { title: "Menu" };
 
@@ -19,7 +21,11 @@ const icon = "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-f
 export default async function MorePage() {
   const user = await requireUser();
   const locale = await getLocale();
-  const pending = await prisma.intro.count({ where: { connectorId: user.id, status: "pending" } });
+  // Demo accounts share the plain app link: their invites are never attributed (src/lib/invites-db.ts).
+  const [pending, invite] = await Promise.all([
+    prisma.intro.count({ where: { connectorId: user.id, status: "pending" } }),
+    user.isDemo ? null : Promise.all([ensureInviteCode(user.id), inviteCount(user.id)]).then(([code, joined]) => ({ url: inviteUrl(APP_URL, code), joined })),
+  ]);
   type Item = { href: string; label: string; Icon: typeof Hash; badge?: number; private?: boolean };
   const groups: { title: string; items: Item[] }[] = [
     {
@@ -61,8 +67,18 @@ export default async function MorePage() {
       <section className="glass mt-4 p-4" data-testid="invite">
         <p className="text-[15px] font-semibold tracking-tight">{t(locale, "invite.title")}</p>
         <p className="mt-0.5 text-[13px] leading-snug text-muted">{t(locale, "invite.body")}</p>
+        {invite && (
+          <div className="mt-3 rounded-2xl bg-raised/70 p-3">
+            <p className="text-[11.5px] font-semibold uppercase tracking-wide text-faint">{t(locale, "invite.yourLink")}</p>
+            <p className="mt-0.5 break-all font-mono text-[13px] text-fg" data-testid="invite-link">{invite.url}</p>
+            <p className="mt-2 flex items-center gap-1.5 text-[13px] text-muted" data-testid="invite-count">
+              <UserPlus size={14} className="text-accent" />
+              {invite.joined === 0 ? t(locale, "invite.joinedNone") : invite.joined === 1 ? t(locale, "invite.joinedOne") : t(locale, "invite.joined").replace("{n}", String(invite.joined))}
+            </p>
+          </div>
+        )}
         <div className="mt-3">
-          <InviteButton url={APP_URL} text={t(locale, "invite.text")} label={t(locale, "invite.cta")} copiedLabel={t(locale, "invite.copied")} />
+          <InviteButton url={invite?.url ?? APP_URL} text={t(locale, "invite.text")} label={t(locale, "invite.cta")} copiedLabel={t(locale, "invite.copied")} />
         </div>
       </section>
 

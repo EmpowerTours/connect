@@ -19,8 +19,8 @@ const routeFolders = (group: string) =>
 describe("robots and sitemap", () => {
   it("robots disallows /api, auth, uploads and onboarding, allows only public pages, points at the sitemap", () => {
     const r = robots();
-    expect(rule().disallow).toEqual(expect.arrayContaining(["/api/", "/auth/", "/media/", "/welcome", "/admin"]));
-    expect(rule().allow).toEqual(["/login", "/graph", "/u/", "/post/"]);
+    expect(rule().disallow).toEqual(expect.arrayContaining(["/api/", "/auth/", "/media/", "/i/", "/welcome", "/admin"]));
+    expect(rule().allow).toEqual(["/$", "/login", "/graph", "/u/", "/post/"]);
     expect(r.sitemap).toBe("https://connect.empowertours.xyz/sitemap.xml");
   });
 
@@ -31,7 +31,7 @@ describe("robots and sitemap", () => {
       expect(blocked(`/${r}`) || blocked(`/${r}/x`), `/${r} must be in MEMBER_PATHS`).toBe(true);
       expect(MEMBER_PATHS.some((p) => p.replace(/\/$/, "") === `/${r}`), `/${r} must be in MEMBER_PATHS`).toBe(true);
     }
-    for (const p of ["/admin", "/profile", "/pipeline", "/intros", "/api/auth/session", "/media/a.webp"]) expect(blocked(p), p).toBe(true);
+    for (const p of ["/admin", "/profile", "/pipeline", "/intros", "/api/auth/session", "/media/a.webp", "/i/abcd2345"]) expect(blocked(p), p).toBe(true);
   });
 
   it("allows every public route folder in src/app/(open) and keeps it out of MEMBER_PATHS", () => {
@@ -50,10 +50,10 @@ describe("robots and sitemap", () => {
 
   it("sitemap lists only public pages, profiles and posts on the canonical host", () => {
     expect(APP_URL).toBe("https://connect.empowertours.xyz");
-    expect(buildSitemap(APP_URL, [], []).map((e) => e.url)).toEqual([`${APP_URL}/login`, `${APP_URL}/graph`]);
+    expect(buildSitemap(APP_URL, [], []).map((e) => e.url)).toEqual([APP_URL, `${APP_URL}/login`, `${APP_URL}/graph`]);
     const at = new Date("2026-10-01T00:00:00Z");
     const urls = buildSitemap(APP_URL, [{ handle: "ana" }], [{ id: "p1", createdAt: at }]).map((e) => e.url);
-    expect(urls).toEqual([`${APP_URL}/login`, `${APP_URL}/graph`, `${APP_URL}/u/ana`, `${APP_URL}/post/p1`]);
+    expect(urls).toEqual([APP_URL, `${APP_URL}/login`, `${APP_URL}/graph`, `${APP_URL}/u/ana`, `${APP_URL}/post/p1`]);
     for (const url of urls) expect(blocked(new URL(url).pathname), url).toBe(false);
     for (const private_ of ["/admin", "/profile", "/pipeline", "/intros", "/api"]) expect(urls.some((u) => u.includes(private_))).toBe(false);
   });

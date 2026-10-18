@@ -7,8 +7,12 @@ import { Greeting } from "@/components/greeting";
 import { TabPage } from "@/components/layout";
 import { TopLine } from "@/components/shell";
 import { timeAgo } from "@/components/time";
+import { Landing } from "@/components/landing";
+import { cookies } from "next/headers";
 import { after } from "next/server";
-import { getLocale, getWorkspace, requireUser } from "@/lib/auth";
+import { getCurrentUser, getLocale, getWorkspace } from "@/lib/auth";
+import { INVITE_COOKIE } from "@/lib/invites";
+import { findInviter } from "@/lib/invites-db";
 import { ingestIfStale } from "@/lib/ingest-schedule";
 import { reportError } from "@/lib/error-report";
 import { prisma } from "@/lib/db";
@@ -19,13 +23,30 @@ import { needsAttention } from "@/lib/pipeline";
 import { firstName, pickInsight } from "@/lib/today";
 
 export const dynamic = "force-dynamic";
+// "/" is the URL people share: the landing page for visitors, Today for members.
+export const metadata = { alternates: { canonical: "/" } };
 
-export default async function TodayPage({ searchParams }: { searchParams: Promise<{ welcome?: string }> }) {
-  const user = await requireUser();
-  const locale = await getLocale();
+type Member = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
+
+export default async function HomePage({ searchParams }: { searchParams: Promise<{ welcome?: string }> }) {
+  const [user, locale] = await Promise.all([getCurrentUser(), getLocale()]);
+  if (!user) return <LandingPage locale={locale} />;
+  return <TodayPage user={user} locale={locale} welcome={(await searchParams).welcome === "1"} />;
+}
+
+/** Signed out: the landing page, with the inviter from an /i/<code> link (src/lib/invites.ts). */
+async function LandingPage({ locale }: { locale: Locale }) {
+  const [inviter, orgs, channels] = await Promise.all([
+    findInviter((await cookies()).get(INVITE_COOKIE)?.value),
+    prisma.organization.count(),
+    prisma.channel.count(),
+  ]);
+  return <Landing locale={locale} inviter={inviter} stats={{ orgs, channels }} />;
+}
+
+async function TodayPage({ user, locale, welcome }: { user: Member; locale: Locale; welcome: boolean }) {
   const now = new Date();
   const ws = await getWorkspace(user.id);
-  const welcome = (await searchParams).welcome === "1";
   after(() => ingestIfStale(prisma).catch((e) => reportError("background ingest failed", e, { scope: "ingest" })));
   // Hero: the busiest org in public news this week, falling back to the last 30 days for quiet weeks.
   const since = new Date(now.getTime() - 30 * 86_400_000);

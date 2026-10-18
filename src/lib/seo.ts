@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import { APP_FULL_NAME, APP_NAME, APP_URL } from "./brand";
 
 /**
- * Pages meant for search engines and link previews: the sign-in page and the public signed-graph
- * explorer, plus the profile and post pages below. Everything else needs a session, or is an API,
- * upload or auth endpoint (src/app/robots.ts).
+ * Pages meant for search engines and link previews: the home page (the landing page when signed
+ * out), the sign-in page and the public signed-graph explorer, plus the profile and post pages
+ * below. Everything else needs a session, or is an API, upload, auth or invite endpoint
+ * (src/app/robots.ts).
  */
-export const PUBLIC_PATHS = ["/login", "/graph"] as const;
+export const PUBLIC_PATHS = ["/", "/login", "/graph"] as const;
 
 /**
  * Route prefixes readable signed out: one per folder in src/app/(open) (tests/seo.test.ts keeps
@@ -22,7 +23,7 @@ export const ROOT_METADATA: Metadata = {
   title: { default: APP_NAME, template: `%s · ${APP_NAME}` },
   description: SITE_DESCRIPTION,
   metadataBase: new URL(APP_URL),
-  // Canonicals are set per public page (/login, /graph); a site-wide one would point every page at "/".
+  // Canonicals are set per public page ("/", /login, /graph); a site-wide one would point every page at "/".
   applicationName: APP_FULL_NAME,
   openGraph: { type: "website", siteName: APP_FULL_NAME, title: APP_FULL_NAME, description: SITE_DESCRIPTION, locale: "en_US", alternateLocale: ["es_MX"] },
   twitter: { card: "summary_large_image", title: APP_FULL_NAME, description: SITE_DESCRIPTION },
@@ -32,8 +33,8 @@ export const ROOT_METADATA: Metadata = {
  * Member-only route prefixes: one per folder in src/app/(app) (tests/seo.test.ts keeps this list
  * in sync). Listed one by one instead of disallowing "/", because "/" is the URL people share:
  * a crawler that may not fetch it (X's card crawler honours robots.txt) shows no preview at all.
- * Signed-out visitors to "/" are redirected to /login, which is public. Profiles and posts are
- * public (PUBLIC_PREFIXES), so they are not listed here.
+ * Signed-out visitors to "/" get the landing page. Profiles and posts are public
+ * (PUBLIC_PREFIXES), so they are not listed here.
  */
 export const MEMBER_PATHS = [
   "/admin",
@@ -54,8 +55,8 @@ export const MEMBER_PATHS = [
   "/updates",
 ] as const;
 
-/** Never crawled. */
-export const DISALLOWED_PATHS = ["/api/", "/auth/", "/media/", "/welcome", ...MEMBER_PATHS] as const;
+/** Never crawled. /i/ is personal invite links (src/app/i/[code]), which only set a cookie and redirect. */
+export const DISALLOWED_PATHS = ["/api/", "/auth/", "/media/", "/i/", "/welcome", ...MEMBER_PATHS] as const;
 
 /** Longest description used in link previews. */
 export const DESCRIPTION_MAX = 200;
@@ -118,7 +119,7 @@ export function buildSitemap(
   posts: { id: string; createdAt: Date }[],
 ): SitemapEntry[] {
   return [
-    ...PUBLIC_PATHS.map((path) => ({ url: `${base}${path}`, changeFrequency: path === "/graph" ? ("daily" as const) : ("monthly" as const) })),
+    ...PUBLIC_PATHS.map((path) => ({ url: path === "/" ? base : `${base}${path}`, changeFrequency: path === "/graph" ? ("daily" as const) : ("monthly" as const) })),
     ...profiles.map((p) => ({ url: `${base}/u/${encodeURIComponent(p.handle)}`, changeFrequency: "weekly" as const, ...(p.lastModified ? { lastModified: p.lastModified } : {}) })),
     ...posts.map((p) => ({ url: `${base}/post/${encodeURIComponent(p.id)}`, lastModified: p.createdAt, changeFrequency: "monthly" as const })),
   ];

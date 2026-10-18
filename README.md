@@ -66,6 +66,8 @@ The default seed (`db:seed`, `setup`, `db:reset`) creates **no people and no con
 
 - **Updates:** 320 characters (code points), post-type chips (Looking for partner, Launch, Hiring, Insight), tag orgs with `$slug` (plain name mentions also tag), mention people with `@handle`, link `/channel`. Reply threads (nested, with connector lines), reshare and quote, likes (optimistic). Following / For you tabs.
 - **Channels:** join/leave, channel feeds, trending ranking (recent-activity decay + membership).
+- **Landing page:** signed-out visitors to `/` get a landing page (programmable feeds, the signed portable graph, Farcaster) with sign-up and sign-in; members get Today at the same URL.
+- **Invite links:** every member has a personal link (`/i/<code>`, random code created on first use) on the Menu page with a count of people who joined through it. Opening a link stores the code in an HttpOnly cookie for 30 days (last link wins) and shows "<name> invited you" on the landing page; sign-up records the inviter (`User.invitedById`) and clears the cookie. Signed-in members opening a link go to the inviter's profile. Admins see totals and top inviters under **Admin → Invites**. Demo accounts share the plain app link and are never credited.
 - **Public profiles and posts:** `/u/<handle>` and `/post/<id>` are readable signed out, with per-page link previews (Open Graph / X card and a generated preview image) and a sign-up prompt that returns the visitor to the page after sign-in. Visitors see public fields only (no email, no wallet address); demo accounts and unfinished profiles are `noindex`; finished profiles and their posts are listed in `sitemap.xml`.
 - **Profiles:** cover, avatar, headline @ org, location, proof badges (work email, LinkedIn, wallet; all **unverified placeholders**), track record (deals closed, intros made, helpful updates → reputation tier), mutual connections, Follow / Request intro, Updates / Replies / About tabs.
 - **Org pages:** logo header with an "Unverified org" pill (no org verification yet), Follow, **Add to my deals**, tabs for updates mentioning the org, people at the org, news signals, public facts, and your private deal panel.
@@ -114,8 +116,9 @@ src/lib/feed.ts           feed queries (home, channel, user, org)
 src/lib/scout/            AI scout interface (fit + intro drafts), mock, OpenAI/Anthropic
 src/lib/i18n.ts           EN/ES strings
 src/app/actions.ts        server actions
-src/app/(app)/…           today (/), opportunities, circle, more, updates, channels, intros, orgs, pipeline, signals, search (members only)
-src/app/(open)/…          u/[handle], post/[id] (readable signed out; members get the app shell)
+src/app/(app)/…           opportunities, circle, more, updates, channels, intros, orgs, pipeline, signals, search (members only)
+src/app/(open)/…          / (landing signed out, Today for members), u/[handle], post/[id] (members get the app shell)
+src/app/i/[code]          invite links (src/lib/invites.ts)
 src/components/           shell/nav, composer, post card + actions, intro modal, deal panel
 tests/                    vitest unit tests
 ```
