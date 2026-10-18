@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   FOCUS_TAGS,
   ONBOARDING_ERRORS,
+  ONBOARDING_STEPS,
   isOnboardingError,
   needsOnboarding,
   onboardingChecklist,
@@ -99,5 +100,16 @@ describe("onboarding: gating and checklist", () => {
     expect(isOnboardingError("photo_type")).toBe(true);
     expect(isOnboardingError("<script>")).toBe(false);
     expect(isOnboardingError(undefined)).toBe(false);
+  });
+});
+
+describe("onboarding: steps", () => {
+  it("is three steps, each with translated copy", () => {
+    expect(ONBOARDING_STEPS).toEqual(["you", "focus", "follow"]);
+    for (const step of ONBOARDING_STEPS) for (const part of ["eyebrow", "title", "body"] as const) {
+      const key = `onb.${step}.${part}` as const;
+      expect(t("en", key)).not.toBe(key);
+      expect(t("es", key)).not.toBe(key);
+    }
   });
 });

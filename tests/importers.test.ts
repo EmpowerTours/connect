@@ -5,6 +5,7 @@ import {
   HubProvider,
   REQUEST_TIMEOUT_MS,
   NeynarProvider,
+  bioToImport,
   getFarcasterProvider,
   isOwnAccount,
   matchFarcasterFollowing,
@@ -91,6 +92,22 @@ describe("farcaster importer", () => {
     expect(acc.addresses).toContain(ME);
     expect(await n.following(9, 100)).toEqual([11, 12]);
     expect(calls[0].headers?.["x-api-key"]).toBe("test-key");
+  });
+
+  it("reads the profile bio from a hub or Neynar and only fills an empty Connect bio", async () => {
+    const hub = fakeFetch({
+      "userNameProofByName?name=ana": { fid: 42 },
+      userDataByFid: { messages: [...userData("ana", "Ana").messages, { data: { userDataBody: { type: "USER_DATA_TYPE_BIO", value: "  BD at Quetzal  " } } }] },
+      verificationsByFid: verifications([]),
+    });
+    expect((await new HubProvider(hub.fetcher, "https://hub.example").findByUsername("ana"))?.bio).toBe("BD at Quetzal");
+    const ny = fakeFetch({ "user/by_username": { user: { fid: 9, username: "sofia", profile: { bio: { text: "Payments\nnerd" } } } } });
+    expect((await new NeynarProvider(ny.fetcher, "k").findByUsername("sofia"))?.bio).toBe("Payments\nnerd");
+
+    expect(bioToImport("", { bio: "Payments\n\n nerd" })).toBe("Payments nerd");
+    expect(bioToImport("Already written", { bio: "x" })).toBeNull();
+    expect(bioToImport("", {})).toBeNull();
+    expect([...bioToImport("", { bio: "é".repeat(500) })!].length).toBe(400);
   });
 
   it("picks Neynar only when a key is set (no key = public hub, no paid API needed)", () => {

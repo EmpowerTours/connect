@@ -159,7 +159,12 @@ npm run graph:verify -- --file graph.json
 The script uses this repo's own domain and types, checks every signature, sequence gaps and duplicates, and admin authority, rebuilds the graph and exits non-zero on any failure. After pulling schema changes run `npm run db:deploy` to apply new migrations.
 
 ## Onboarding and profile photos
-After a first Mera passkey sign-in, members go through a five-step welcome flow at `/welcome` (name + headline, organization, region + focus tags, photo + links, first ask/offer) before they reach the app; the local demo user skips it. Picking a listed organization can also file a pending claim (wallet-verified members only); an unlisted one becomes an org request for admin review. Region, focus tags, photo and links stay editable on `/profile`.
+After a first Mera passkey sign-in, members go through a three-step welcome flow at `/welcome` before they reach the app; the local demo user skips it:
+1. **You:** name, headline and organization. Picking a listed organization can also file a pending claim (wallet-verified members only); an unlisted one becomes an org request for admin review.
+2. **Focus:** region and focus tags.
+3. **Follow:** **starter packs** and an optional **Farcaster import**. Starter packs (`src/lib/curated-packs.ts`) are curated follow sets built from the seeded organizations and channels: picking one follows its organizations, joins its channels and follows up to 12 people (members verified at those organizations, then the most active posters in those channels). The two packs that best match the focus tags are preselected. The Farcaster lookup uses the same importer as `/import` (public hub, or Neynar with `NEYNAR_API_KEY`); people you follow there who are already here show up ticked, and an empty Connect bio is filled from your Farcaster bio. If the source is unreachable the step says so and the packs still work.
+
+Photo, links and a first ask/offer are no longer onboarding steps: the Today checklist points to them, and region, focus tags, photo and links stay editable on `/profile`.
 
 Photos are sniffed by magic bytes (JPEG, PNG or WebP only), capped at 5 MB, at least 64 px and at most 40 MP, then re-encoded with sharp to a 512×512 WebP, which drops EXIF/GPS and all other metadata. Storage sits behind a small `BlobStore` interface (`src/lib/storage.ts`), chosen with `STORAGE_DRIVER`:
 - `local` (default): files under `.data/uploads`, or `UPLOADS_DIR`. In production `UPLOADS_DIR` must be an absolute path on a mounted Railway volume (the container disk is replaced on every deploy).

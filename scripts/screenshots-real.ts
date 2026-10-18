@@ -123,28 +123,20 @@ async function main() {
     await page.goto(`${BASE}/`);
     await page.waitForURL(/\/welcome/);
     await page.fill("input[name=headline]", "Head of Partnerships, LatAm payments");
-    await snap(page, "onboarding-1-you");
-    await submitAndWait(page, "form button:not([name]):not([type=button])", /step=org/);
-
     await page.fill("input[name=org]", "Bitso");
     await page.locator("input[name=claim]").evaluate((el) => ((el as HTMLInputElement).checked = true));
     await page.locator("input[name=org]").blur();
-    await snap(page, "onboarding-2-org");
+    await snap(page, "onboarding-1-you");
     await submitAndWait(page, "form button:not([name]):not([type=button])", /step=focus/);
 
     await click(page, "input[name=region][value=latam]");
     for (const tag of ["payments", "stablecoins", "remittances"]) await click(page, `input[name=tags][value=${tag}]`);
-    await snap(page, "onboarding-3-focus");
-    await submitAndWait(page, "form button:not([name]):not([type=button])", /step=profile/);
+    await snap(page, "onboarding-2-focus");
+    await submitAndWait(page, "form button:not([name]):not([type=button])", /step=follow/);
 
-    await page.setInputFiles("input[name=photo]", photo);
-    await page.fill("input[name=x]", "sofia_marin_pay");
-    await page.fill("input[name=linkedin]", "linkedin.com/in/sofia-marin-pay");
-    await snap(page, "onboarding-4-profile");
-    await submitAndWait(page, "form button:not([name]):not([type=button])", /step=first/);
-
-    await snap(page, "onboarding-5-first");
-    await submitAndWait(page, "button[name=skip]", /welcome=1/);
+    // Starter packs come preselected from the focus areas; the Farcaster lookup is optional.
+    await snap(page, "onboarding-3-follow");
+    await submitAndWait(page, "[data-testid=onb-packs] button:not([name])", /welcome=1/);
 
     await snap(page, "today");
     await page.evaluate(() => document.getElementById("getting-started")?.scrollIntoView({ block: "start" }));
@@ -157,6 +149,13 @@ async function main() {
     await snap(page, "opportunities-empty");
     await page.goto(`${BASE}/opportunities?topic=payments`);
     await snap(page, "opportunities-empty-topic");
+
+    // Photo and links moved out of onboarding into Edit profile.
+    await page.goto(`${BASE}/profile`);
+    await page.setInputFiles("input[name=photo]", photo);
+    await page.fill("input[name=x]", "sofia_marin_pay");
+    await page.fill("input[name=linkedin]", "linkedin.com/in/sofia-marin-pay");
+    await submitAndWait(page, "#photo form button:not([name]):not([type=button])", /saved=1/);
 
     const me = (await (await page.request.get(`${BASE}/api/auth/session`)).json()) as { user: { handle: string } };
     await page.goto(`${BASE}/u/${me.user.handle}`);

@@ -30,6 +30,8 @@ export interface FarcasterAccount {
   displayName: string;
   /** Lowercased custody + verified Ethereum addresses. */
   addresses: string[];
+  /** Profile bio, when the account has one (used to prefill an empty Connect bio). */
+  bio?: string;
 }
 
 export interface FarcasterProvider {
@@ -192,17 +194,19 @@ export class HubProvider implements FarcasterProvider {
     ]);
     let username = "";
     let displayName = "";
+    let bio = "";
     for (const m of arr(obj(data).messages)) {
       const body = obj(obj(obj(m).data).userDataBody);
       if (body.type === "USER_DATA_TYPE_USERNAME" && typeof body.value === "string") username = body.value;
       if (body.type === "USER_DATA_TYPE_DISPLAY" && typeof body.value === "string") displayName = body.value;
+      if (body.type === "USER_DATA_TYPE_BIO" && typeof body.value === "string") bio = body.value.trim();
     }
     const addresses = new Set<string>(custody ? [custody.toLowerCase()] : []);
     for (const m of arr(obj(verifications).messages)) {
       const a = obj(obj(obj(m).data).verificationAddAddressBody).address;
       if (typeof a === "string" && ADDRESS.test(a.toLowerCase())) addresses.add(a.toLowerCase());
     }
-    return { fid, username, displayName, addresses: [...addresses] };
+    return { fid, username, displayName, addresses: [...addresses], ...(bio ? { bio } : {}) };
   }
 
   async findByAddresses(addresses: string[]): Promise<FarcasterAccount[]> {
@@ -256,11 +260,13 @@ function neynarAccount(u: unknown): FarcasterAccount | null {
   const addresses = new Set<string>();
   if (typeof o.custody_address === "string") addresses.add(o.custody_address.toLowerCase());
   for (const a of arr(obj(o.verified_addresses).eth_addresses)) if (typeof a === "string") addresses.add(a.toLowerCase());
+  const bio = obj(obj(o.profile).bio).text;
   return {
     fid,
     username: typeof o.username === "string" ? o.username : "",
     displayName: typeof o.display_name === "string" ? o.display_name : "",
     addresses: [...addresses].filter((a) => ADDRESS.test(a)),
+    ...(typeof bio === "string" && bio.trim() ? { bio: bio.trim() } : {}),
   };
 }
 
@@ -335,4 +341,14 @@ export function matchFarcasterFollowing(
   return members
     .filter((m) => m.farcasterVerified && m.farcasterFid !== null && fids.has(m.farcasterFid))
     .map((m) => ({ userId: m.id, username: m.farcasterUsername }));
+}
+
+/** Longest bio Connect stores (matches the profile form). */
+export const BIO_MAX = 400;
+
+/** A Farcaster bio to copy into an empty Connect bio, or null. Whitespace collapsed, capped by code points. */
+export function bioToImport(currentBio: string, account: Pick<FarcasterAccount, "bio">): string | null {
+  if (currentBio.trim() || !account.bio) return null;
+  const flat = account.bio.replace(/\s+/g, " ").trim();
+  return flat ? [...flat].slice(0, BIO_MAX).join("") : null;
 }

@@ -5,40 +5,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { FarcasterUnavailable, MAX_FOLLOWING, getFarcasterProvider, isOwnAccount, matchFarcasterFollowing, normalizeFarcasterUsername } from "@/lib/importers/farcaster";
-import { channelKey, filterDrafts, mergeReasons, parseReasons, userKey, type ImportSource, type SuggestionDraft } from "@/lib/importers/suggestions";
+import { runFarcasterImport } from "@/lib/importers/farcaster-run";
+import { confirmSuggestions, persistDrafts, recordRun } from "@/lib/importers/persist";
+import { channelKey, userKey, type ImportSource, type SuggestionDraft } from "@/lib/importers/suggestions";
 import { STARTER_PACKS, MAX_MEMBERS_CHECKED, PACK_CHECK_TTL_MS, httpRpc, mapLimit, packsHeldBy, holdsPack, RpcUnavailable } from "@/lib/importers/wallet";
 import { MAX_X_FILE_BYTES, matchXFollowing, parseXFile, selfAccountMatchesProfile, type XArchiveParse } from "@/lib/importers/x";
 
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
-
-/** Stores drafts as pending suggestions; repeat imports add reasons instead of duplicating. */
-async function persistDrafts(userId: string, drafts: SuggestionDraft[]): Promise<number> {
-  const [following, joined] = await Promise.all([
-    prisma.followUser.findMany({ where: { followerId: userId }, select: { followeeId: true } }),
-    prisma.channelMember.findMany({ where: { userId }, select: { channelId: true } }),
-  ]);
-  const clean = filterDrafts(drafts, {
-    viewerId: userId,
-    following: new Set(following.map((f) => f.followeeId)),
-    joinedChannels: new Set(joined.map((j) => j.channelId)),
-  });
-  for (const d of clean) {
-    const existing = await prisma.importSuggestion.findUnique({ where: { userId_key: { userId, key: d.key } } });
-    if (existing) {
-      await prisma.importSuggestion.update({ where: { id: existing.id }, data: { reasons: JSON.stringify(mergeReasons(parseReasons(existing.reasons), d.reason)) } });
-    } else {
-      await prisma.importSuggestion.create({
-        data: { userId, key: d.key, targetUserId: d.targetUserId ?? null, channelId: d.channelId ?? null, reasons: JSON.stringify([d.reason]) },
-      });
-    }
-  }
-  return clean.length;
-}
-
-async function recordRun(userId: string, source: ImportSource, found: number, matched: number, detail: Record<string, unknown>) {
-  await prisma.importRun.create({ data: { userId, source, found, matched, detail: JSON.stringify(detail) } });
-}
 
 function done(source: ImportSource, extra = ""): never {
   revalidatePath("/import");
@@ -50,42 +23,9 @@ function done(source: ImportSource, extra = ""): never {
 export async function importFarcasterAction(fd: FormData) {
   const user = await requireUser();
   if (!(await limitMember(user.id, "import")).ok) redirect("/import?fcError=rate_limited#farcaster");
-  const wallet = user.walletVerified && user.walletAddress ? user.walletAddress : null;
-  const raw = str(fd, "username");
-  const username = raw ? normalizeFarcasterUsername(raw) : null;
-  if (raw && !username) redirect("/import?fcError=username#farcaster");
-  if (!username && !wallet) redirect("/import?fcError=need_wallet#farcaster");
-
-  const provider = getFarcasterProvider();
-  let fcPartial = false;
-  try {
-    const account = username ? await provider.findByUsername(username) : (await provider.findByAddresses([wallet!]))[0] ?? null;
-    if (!account) redirect(`/import?fcError=${username ? "not_found" : "not_found_wallet"}#farcaster`);
-    const verified = !!wallet && isOwnAccount(account, [wallet]);
-    await prisma.$transaction(async (tx) => {
-      // A wallet-proven link wins: nobody else can stay verified for this fid.
-      if (verified) await tx.user.updateMany({ where: { farcasterFid: account.fid, NOT: { id: user.id } }, data: { farcasterVerified: false } });
-      await tx.user.update({ where: { id: user.id }, data: { farcasterFid: account.fid, farcasterUsername: account.username, farcasterVerified: verified } });
-    });
-    // Bounded walk (per-request timeouts plus an overall budget); a slow source yields a partial list.
-    const { fids, partial } = await provider.followingWithStatus(account.fid, MAX_FOLLOWING);
-    const members = await prisma.user.findMany({
-      where: { farcasterVerified: true, farcasterFid: { in: fids } },
-      select: { id: true, farcasterFid: true, farcasterVerified: true, farcasterUsername: true },
-    });
-    const drafts: SuggestionDraft[] = matchFarcasterFollowing(fids, members).map((m) => ({
-      key: userKey(m.userId),
-      targetUserId: m.userId,
-      reason: { source: "farcaster", code: "fc_follow", detail: m.username },
-    }));
-    const matched = await persistDrafts(user.id, drafts);
-    await recordRun(user.id, "farcaster", fids.length, matched, { fid: account.fid, username: account.username, verified, provider: provider.name, partial });
-    if (partial) fcPartial = true;
-  } catch (e) {
-    if (e instanceof FarcasterUnavailable) redirect(`/import?fcError=unavailable&why=${encodeURIComponent(e.message)}#farcaster`);
-    throw e;
-  }
-  done("farcaster", fcPartial ? "&partial=farcaster" : "");
+  const r = await runFarcasterImport(user, str(fd, "username"));
+  if (!r.ok) redirect(`/import?fcError=${r.error}${r.why ? `&why=${encodeURIComponent(r.why)}` : ""}#farcaster`);
+  done("farcaster", r.partial ? "&partial=farcaster" : "");
 }
 
 /* ---------- X archive upload ---------- */
@@ -184,28 +124,10 @@ export async function importWalletAction() {
 
 export async function followSuggestionsAction(fd: FormData) {
   const user = await requireUser();
-  const ids = fd.getAll("ids").map(String).slice(0, 500);
-  const picked = await prisma.importSuggestion.findMany({ where: { id: { in: ids }, userId: user.id, status: "pending" } });
-  for (const s of picked) {
-    if (s.targetUserId && s.targetUserId !== user.id) {
-      await prisma.followUser.upsert({
-        where: { followerId_followeeId: { followerId: user.id, followeeId: s.targetUserId } },
-        create: { followerId: user.id, followeeId: s.targetUserId },
-        update: {},
-      });
-    }
-    if (s.channelId) {
-      await prisma.channelMember.upsert({
-        where: { userId_channelId: { userId: user.id, channelId: s.channelId } },
-        create: { userId: user.id, channelId: s.channelId },
-        update: {},
-      });
-    }
-    await prisma.importSuggestion.update({ where: { id: s.id }, data: { status: "followed" } });
-  }
+  const followed = await confirmSuggestions(user.id, fd.getAll("ids").map(String));
   revalidatePath("/", "layout");
   // No anchor: the confirmation banner sits at the top of the page.
-  redirect(`/import?followed=${picked.length}`);
+  redirect(`/import?followed=${followed}`);
 }
 
 export async function dismissSuggestionsAction(fd: FormData) {

@@ -56,7 +56,6 @@ export default async function EditProfilePage({ searchParams }: { searchParams: 
         <section id="photo" className="glass scroll-mt-20 p-4">
           <h2 className="mb-3 font-bold">{t(locale, "profile.photoLinks")}</h2>
           <form action={saveProfileExtrasAction} className="space-y-4">
-            <input type="hidden" name="back" value="profile" />
             <PhotoPicker
               current={avatarUrl(user.avatarKey)}
               fallback={<UserAvatar name={user.name} seed={user.handle} size={72} ring />}

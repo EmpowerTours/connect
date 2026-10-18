@@ -1,26 +1,29 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, AtSign, Briefcase, Building2, Globe, Sparkles } from "lucide-react";
-import { firstOpportunityAction, saveBasicsAction, saveFocusAction, saveOrgAction, saveProfileExtrasAction } from "@/app/onboarding-actions";
+import { ArrowLeft, Building2, Check, Hash, Landmark, Users } from "lucide-react";
+import { finishOnboardingAction, onboardingFarcasterAction, saveBasicsAction, saveFocusAction } from "@/app/onboarding-actions";
 import { UserAvatar } from "@/components/avatar";
-import { PhotoPicker } from "@/components/photo-picker";
+import { FarcasterMark } from "@/components/farcaster-mark";
 import { SubmitButton } from "@/components/submit-button";
 import { VerifiedOnMonad } from "@/components/wallet-badge";
 import { getLocale, requireUser } from "@/lib/auth";
 import { APP_NAME } from "@/lib/brand";
 import { ORG_TYPES, REGIONS } from "@/lib/constants";
 import { prisma } from "@/lib/db";
-import { ORG_TYPE_LABELS, REGION_LABELS, t, type Locale } from "@/lib/i18n";
+import { rankPacks } from "@/lib/curated-packs";
+import { loadPackPreviews } from "@/lib/curated-packs-db";
+import { ORG_TYPE_LABELS, REGION_LABELS, t, type Locale, type MessageKey } from "@/lib/i18n";
 import { parseList } from "@/lib/json";
 import { avatarUrl } from "@/lib/media";
-import { FOCUS_TAGS, MAX_FOCUS_TAGS, ONBOARDING_STEPS, isFocusTag, isOnboardingError, type OnboardingStep } from "@/lib/onboarding";
-import { OPP_BODY_MAX, OPP_HEADLINE_MAX } from "@/lib/opportunities";
+import { FOCUS_TAGS, MAX_FOCUS_TAGS, ONBOARDING_STEPS, isOnboardingError, type OnboardingStep } from "@/lib/onboarding";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Welcome" };
 
 
-export default async function WelcomePage({ searchParams }: { searchParams: Promise<{ step?: string; error?: string }> }) {
+type Search = { step?: string; error?: string; fc?: string; fcError?: string; partial?: string };
+
+export default async function WelcomePage({ searchParams }: { searchParams: Promise<Search> }) {
   const user = await requireUser();
   const locale = await getLocale();
   const sp = await searchParams;
@@ -45,7 +48,7 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
           )}
           <span className="text-[12px] font-semibold text-faint">{t(locale, "onb.stepOf").replace("{n}", String(idx + 1)).replace("{total}", String(ONBOARDING_STEPS.length))}</span>
         </header>
-        <div className="mt-3 grid grid-cols-5 gap-1.5" aria-hidden>
+        <div className="mt-3 grid grid-cols-3 gap-1.5" aria-hidden>
           {ONBOARDING_STEPS.map((s, i) => (
             <span key={s} className={`h-1.5 rounded-full ${i <= idx ? "bg-accent" : "bg-lilac/50"}`} />
           ))}
@@ -59,11 +62,10 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
 
         <section className="glass mt-6 p-5">
           {current === "you" && <StepYou user={user} locale={locale} />}
-          {current === "org" && <StepOrg user={user} locale={locale} />}
           {current === "focus" && <StepFocus user={user} locale={locale} />}
-          {current === "profile" && <StepProfile user={user} locale={locale} />}
-          {current === "first" && <StepFirst user={user} locale={locale} />}
+          {current === "follow" && <StepFollowSource user={user} locale={locale} sp={sp} />}
         </section>
+        {current === "follow" && <StepFollow user={user} locale={locale} />}
       </div>
     </main>
   );
@@ -73,7 +75,9 @@ type U = Awaited<ReturnType<typeof requireUser>>;
 const field = "block";
 const cta = "btn-primary h-12 w-full text-[15px] shadow-[0_10px_24px_-12px_rgb(124_58_237/0.7)]";
 
-function StepYou({ user, locale }: { user: U; locale: Locale }) {
+async function StepYou({ user, locale }: { user: U; locale: Locale }) {
+  const orgs = await prisma.organization.findMany({ select: { name: true, slug: true }, orderBy: { name: "asc" } });
+  const pending = await prisma.orgRequest.findFirst({ where: { userId: user.id, status: "pending" }, select: { name: true } });
   return (
     <form action={saveBasicsAction} className="space-y-4">
       <div className="flex items-center gap-3">
@@ -91,16 +95,6 @@ function StepYou({ user, locale }: { user: U; locale: Locale }) {
         <span className="label">{t(locale, "onb.headline")}</span>
         <input name="headline" defaultValue={user.headline} required maxLength={100} className="input" placeholder={t(locale, "onb.headlinePh")} />
       </label>
-      <SubmitButton className={cta}>{t(locale, "onb.continue")}</SubmitButton>
-    </form>
-  );
-}
-
-async function StepOrg({ user, locale }: { user: U; locale: Locale }) {
-  const orgs = await prisma.organization.findMany({ select: { name: true, slug: true }, orderBy: { name: "asc" } });
-  const pending = await prisma.orgRequest.findFirst({ where: { userId: user.id, status: "pending" }, select: { name: true } });
-  return (
-    <form action={saveOrgAction} className="space-y-4">
       <label className={field}>
         <span className="label">{t(locale, "onb.org")}</span>
         <span className="relative block">
@@ -146,7 +140,7 @@ function StepFocus({ user, locale }: { user: U; locale: Locale }) {
     "cursor-pointer select-none rounded-full border border-line bg-white/80 px-3.5 py-2 text-[13.5px] font-medium text-muted transition has-[:checked]:border-accent has-[:checked]:bg-accent has-[:checked]:text-white has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent/40";
   return (
     <form action={saveFocusAction} className="space-y-5">
-      <fieldset>
+      <fieldset className="min-w-0">
         <legend className="label">{t(locale, "onb.region")}</legend>
         <div className="flex flex-wrap gap-2">
           {REGIONS.map((r) => (
@@ -157,7 +151,7 @@ function StepFocus({ user, locale }: { user: U; locale: Locale }) {
           ))}
         </div>
       </fieldset>
-      <fieldset>
+      <fieldset className="min-w-0">
         <legend className="label">{t(locale, "onb.focus").replace("{max}", String(MAX_FOCUS_TAGS))}</legend>
         <div className="flex flex-wrap gap-2">
           {FOCUS_TAGS.map((tag) => (
@@ -173,68 +167,110 @@ function StepFocus({ user, locale }: { user: U; locale: Locale }) {
   );
 }
 
-function StepProfile({ user, locale }: { user: U; locale: Locale }) {
-  const linkRow = "relative block";
-  const ico = "pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-faint";
+/** Step 3, top card: find people you already follow on Farcaster (optional). */
+async function StepFollowSource({ user, locale, sp }: { user: U; locale: Locale; sp: Search }) {
+  const hasWallet = user.walletVerified && !!user.walletAddress;
+  const fcKey = `import.error.${sp.fcError}` as MessageKey;
+  const fcError = sp.fcError ? t(locale, sp.fcError in IMPORT_ERRORS ? fcKey : "import.error.unavailable") : null;
+  const matched = sp.fc !== undefined ? Math.max(0, Number.parseInt(sp.fc, 10) || 0) : null;
   return (
-    <form action={saveProfileExtrasAction} className="space-y-5">
-      <PhotoPicker
-        current={avatarUrl(user.avatarKey)}
-        fallback={<UserAvatar name={user.name} seed={user.handle} size={84} ring />}
-        label={t(locale, "onb.photo")}
-        hint={t(locale, "onb.photoHint")}
-      />
-      <div className="space-y-2.5">
-        <span className="label">{t(locale, "onb.links")}</span>
-        <label className={linkRow}><AtSign size={16} className={ico} /><input name="x" defaultValue={user.linkX.replace("https://x.com/", "")} maxLength={300} className="input pl-10" placeholder={t(locale, "onb.xPh")} aria-label="X" /></label>
-        <label className={linkRow}><Briefcase size={16} className={ico} /><input name="linkedin" defaultValue={user.linkLinkedin} maxLength={300} className="input pl-10" placeholder="linkedin.com/in/…" aria-label="LinkedIn" /></label>
-        <label className={linkRow}><Globe size={16} className={ico} /><input name="website" defaultValue={user.linkWebsite} maxLength={300} className="input pl-10" placeholder={t(locale, "onb.websitePh")} aria-label={t(locale, "org.website")} /></label>
+    <div id="farcaster" className="scroll-mt-6" data-testid="onb-farcaster">
+      <div className="flex items-start gap-3">
+        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-accent-soft text-accent-ink"><FarcasterMark /></span>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-[16px] font-semibold tracking-tight">{t(locale, "onb.fc.title")}</h2>
+          <p className="mt-0.5 text-[13px] leading-snug text-muted">{t(locale, "onb.fc.body")}</p>
+        </div>
       </div>
-      <SubmitButton className={cta}>{t(locale, "onb.continue")}</SubmitButton>
-    </form>
+      <form action={onboardingFarcasterAction} className="mt-3 flex gap-2">
+        <input name="username" defaultValue={user.farcasterUsername} className="input h-10 flex-1 py-1.5" placeholder={t(locale, "import.fc.placeholder")} aria-label={t(locale, "import.fc.placeholder")} autoComplete="off" />
+        <SubmitButton className="btn-primary h-10 shrink-0 text-[13px]">{t(locale, "onb.fc.cta")}</SubmitButton>
+      </form>
+      <p className="mt-2 text-[12px] text-faint">{t(locale, hasWallet ? "import.fc.walletHint" : "import.fc.noWalletHint")}</p>
+      {fcError && <p role="alert" className="mt-3 rounded-xl bg-danger/10 px-3 py-2 text-[13px] text-danger">{fcError}</p>}
+      {matched !== null && !fcError && (
+        <p role="status" className="mt-3 rounded-xl bg-accent-soft px-3 py-2 text-[13px] text-accent-ink">
+          {matched > 0 ? t(locale, "onb.fc.found").replace("{n}", String(matched)) : t(locale, "onb.fc.none")}
+          {sp.partial ? ` ${t(locale, "import.partial")}` : ""}
+        </p>
+      )}
+    </div>
   );
 }
 
-function StepFirst({ user, locale }: { user: U; locale: Locale }) {
-  const topics = parseList(user.focusTags).filter(isFocusTag);
+/** Farcaster-import error codes with a message (src/lib/i18n.ts import.error.*). */
+const IMPORT_ERRORS: Record<string, true> = { username: true, need_wallet: true, not_found: true, not_found_wallet: true, unavailable: true, rate_limited: true };
+
+/** Step 3, main card: starter packs (preselected from the focus areas) and Farcaster matches, then finish. */
+async function StepFollow({ user, locale }: { user: U; locale: Locale }) {
+  const ranked = rankPacks(parseList(user.focusTags));
+  const [previews, matches] = await Promise.all([
+    loadPackPreviews(user.id, ranked.map((r) => r.pack)),
+    prisma.importSuggestion.findMany({
+      where: { userId: user.id, status: "pending", targetUserId: { not: null } },
+      include: { targetUser: { select: { id: true, name: true, handle: true, headline: true, orgName: true, avatarKey: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    }),
+  ]);
+  const byId = new Map(previews.map((p) => [p.pack.id, p]));
   return (
-    <form action={firstOpportunityAction} className="space-y-4">
-      <fieldset>
-        <legend className="label">{t(locale, "opps.kind")}</legend>
-        <div className="inline-flex rounded-full bg-raised p-1">
-          {(["ask", "offer"] as const).map((k, i) => (
-            <label key={k} className="cursor-pointer rounded-full px-4 py-1.5 text-[13px] font-semibold text-faint transition has-[:checked]:bg-white has-[:checked]:text-accent-ink has-[:checked]:shadow-sm">
-              <input type="radio" name="kind" value={k} defaultChecked={i === 0} className="sr-only" />
-              {t(locale, k === "ask" ? "opps.ask" : "opps.offer")}
-            </label>
-          ))}
-        </div>
-      </fieldset>
-      <label className={field}>
-        <span className="label">{t(locale, "opps.headline")}</span>
-        <input name="headline" maxLength={OPP_HEADLINE_MAX} className="input" placeholder={t(locale, "onb.firstPh")} />
-      </label>
-      <label className={field}>
-        <span className="label">{t(locale, "opps.body")}</span>
-        <textarea name="body" rows={3} maxLength={OPP_BODY_MAX} className="input" placeholder={t(locale, "opps.bodyPh")} />
-      </label>
-      {topics.length > 0 && (
-        <fieldset>
-          <legend className="label">{t(locale, "opps.topic")}</legend>
-          <div className="flex flex-wrap gap-2">
-            {topics.map((tag, i) => (
-              <label key={tag} className="cursor-pointer select-none rounded-full border border-line bg-white/80 px-3 py-1.5 text-[12.5px] font-medium text-muted transition has-[:checked]:border-accent has-[:checked]:bg-accent has-[:checked]:text-white">
-                <input type="radio" name="topic" value={tag} defaultChecked={i === 0} className="sr-only" />
-                {t(locale, `focus.${tag}`)}
-              </label>
+    <form action={finishOnboardingAction} className="glass mt-4 space-y-4 p-5" data-testid="onb-packs">
+      {matches.length > 0 && (
+        <fieldset className="min-w-0">
+          <legend className="label">{t(locale, "onb.fc.matches").replace("{n}", String(matches.length))}</legend>
+          <ul className="divide-y divide-line/70 overflow-hidden rounded-2xl border border-line bg-white/70">
+            {matches.map((m) => m.targetUser && (
+              <li key={m.id}>
+                <label className="flex cursor-pointer items-center gap-3 px-3 py-2.5">
+                  <input type="checkbox" name="ids" value={m.id} defaultChecked className="h-4 w-4 accent-[#7c3aed]" />
+                  <UserAvatar name={m.targetUser.name} seed={m.targetUser.handle} src={avatarUrl(m.targetUser.avatarKey)} size={32} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[14px] font-semibold">{m.targetUser.name}</span>
+                    <span className="block truncate text-[12px] text-faint">{[m.targetUser.headline, m.targetUser.orgName].filter(Boolean).join(" @ ") || `@${m.targetUser.handle}`}</span>
+                  </span>
+                </label>
+              </li>
             ))}
-          </div>
-          <p className="mt-2 flex items-center gap-1.5 text-[12.5px] text-accent-ink">
-            <Sparkles size={13} /> {t(locale, "onb.firstHint").replace("{topic}", t(locale, `focus.${topics[0]}`))}
-          </p>
+          </ul>
         </fieldset>
       )}
-      <SubmitButton className={cta}>{t(locale, "onb.post")}</SubmitButton>
+      <fieldset className="min-w-0">
+        <legend className="label">{t(locale, "onb.packs")}</legend>
+        <p className="-mt-1 mb-3 text-[12.5px] leading-snug text-muted">{t(locale, "onb.packsHint")}</p>
+        <div className="space-y-2.5">
+          {ranked.map(({ pack, preselected }) => {
+            const p = byId.get(pack.id);
+            if (!p) return null;
+            return (
+              <label key={pack.id} className="flex cursor-pointer items-start gap-3 rounded-2xl border border-line bg-white/80 p-3.5 transition has-[:checked]:border-accent has-[:checked]:bg-accent-soft/50" data-testid={`pack-${pack.id}`}>
+                <input type="checkbox" name="packs" value={pack.id} defaultChecked={preselected} className="peer sr-only" />
+                <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-line-strong bg-white text-transparent peer-checked:border-accent peer-checked:bg-accent peer-checked:text-white">
+                  <Check size={13} strokeWidth={3} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[14.5px] font-semibold">{pack.label[locale]}</span>
+                  <span className="mt-0.5 block text-[12.5px] leading-snug text-muted">{pack.blurb[locale]}</span>
+                  <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-faint">
+                    {p.channels.length > 0 && <span className="inline-flex items-center gap-1"><Hash size={12} />{p.channels.map((c) => c.slug).join(", ")}</span>}
+                    {p.orgs.length > 0 && <span className="inline-flex items-center gap-1"><Landmark size={12} />{t(locale, "onb.packOrgs").replace("{n}", String(p.orgs.length))}</span>}
+                    {p.people.length > 0 && (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Users size={12} />
+                        <span className="flex -space-x-1.5">
+                          {p.people.slice(0, 4).map((u) => <UserAvatar key={u.id} name={u.name} seed={u.handle} src={avatarUrl(u.avatarKey)} size={18} ring />)}
+                        </span>
+                        {t(locale, "onb.packPeople").replace("{n}", String(p.people.length))}
+                      </span>
+                    )}
+                  </span>
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      </fieldset>
+      <SubmitButton className={cta}>{t(locale, "onb.finish")}</SubmitButton>
       <button name="skip" value="1" formNoValidate className="btn-ghost h-11 w-full text-[14px]">{t(locale, "onb.skip")}</button>
     </form>
   );

@@ -20,7 +20,12 @@ export const FOCUS_TAGS = [
 export type FocusTag = (typeof FOCUS_TAGS)[number];
 export const MAX_FOCUS_TAGS = 5;
 
-export const ONBOARDING_STEPS = ["you", "org", "focus", "profile", "first"] as const;
+/**
+ * Three steps: who you are (name, headline, organization), what you work on, and who to follow
+ * (starter packs plus a Farcaster import). Photo, links and a first ask live on the Today
+ * checklist and the profile page instead of blocking sign-up.
+ */
+export const ONBOARDING_STEPS = ["you", "focus", "follow"] as const;
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
 export function isFocusTag(v: string): v is FocusTag {
