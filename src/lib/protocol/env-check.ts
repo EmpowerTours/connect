@@ -12,6 +12,7 @@ import { PROTOCOL_CHAINS, protocolChainId, protocolRpcUrl } from "./chains";
 import { loadDeployment, type ProtocolDeployment } from "./deployments";
 import { loadRelayerAccount, type KeyFs } from "./relayer/key";
 import { relayerLimitsFromEnv } from "./relayer/policy";
+import { checkSponsorEnv } from "./sponsor/senders";
 
 type Env = Record<string, string | undefined>;
 type Report = { errors: string[]; warnings: string[] };
@@ -62,6 +63,9 @@ export function checkProtocolEnv(env: Env, opts: Opts = {}): Report {
   const warnings: string[] = [];
   // The relayer key belongs only on the relayer service, never in the web app (flag on or off).
   if (env.RELAYER_KEY || env.RELAYER_KEY_FILE) errors.push("RELAYER_KEY: must not be set on the web app; it belongs only on the relayer service");
+  const sponsor = checkSponsorEnv(env);
+  errors.push(...sponsor.errors);
+  warnings.push(...sponsor.warnings);
   if (!protocolEnabled(env)) {
     if (env.RELAYER_URL) warnings.push("RELAYER_URL is set but PROTOCOL_ENABLED is off: sponsorship stays off");
     return { errors, warnings };

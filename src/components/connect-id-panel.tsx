@@ -92,7 +92,7 @@ export function ConnectIdPanel() {
             {busy === "Register" ? <Loader2 size={18} className="animate-spin" /> : <Fingerprint size={18} />} Create my Connect ID
           </button>
           {me.paused && <p className="text-sm text-faint">New registrations are paused for now.</p>}
-          {!me.sponsored && <p className="text-xs text-faint">Network fees are sponsored for members who joined with an invite link or verified a phone or email. Otherwise you can send your signed request from any wallet with a little MON.</p>}
+          {!me.sponsored && <SponsorCheck channels={cfg.sponsorChannels ?? []} onDone={load} />}
         </div>
       ) : (
         <>
@@ -144,5 +144,65 @@ export function ConnectIdPanel() {
       )}
       {msg && <p role={msg.ok ? "status" : "alert"} className={`rounded-xl p-2.5 text-sm ${msg.ok ? "bg-black/5 dark:bg-white/5" : "bg-danger/10 text-danger"}`}>{msg.text}</p>}
     </section>
+  );
+}
+
+/** Earn sponsored fees with a one-time code (email by default; phone only when a provider exists). */
+function SponsorCheck({ channels, onDone }: { channels: ("email" | "phone")[]; onDone: () => Promise<void> }) {
+  const [channel, setChannel] = useState<"email" | "phone">(channels[0] ?? "email");
+  const [address, setAddress] = useState("");
+  const [sentTo, setSentTo] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+
+  if (channels.length === 0) {
+    return <p className="text-xs text-faint">Network fees are sponsored for members who joined with an invite link. Otherwise you can send your signed request from any wallet with a little MON.</p>;
+  }
+
+  async function step(work: () => Promise<void>) {
+    setBusy(true);
+    setNote(null);
+    try {
+      await work();
+    } catch (e) {
+      setNote({ ok: false, text: e instanceof Error ? e.message : "Something went wrong." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2 rounded-xl bg-black/5 p-2.5 text-sm dark:bg-white/5">
+      <p>Get free network fees: confirm {channels.length > 1 ? "an email or phone number" : channels[0] === "email" ? "your email" : "your phone number"} once. We keep only a fingerprint of it, never the address itself.</p>
+      {!sentTo ? (
+        <div className="flex flex-wrap gap-2">
+          {channels.length > 1 && (
+            <select value={channel} onChange={(e) => setChannel(e.target.value as "email" | "phone")} className="input h-10">
+              {channels.map((c) => <option key={c} value={c}>{c === "email" ? "Email" : "Phone"}</option>)}
+            </select>
+          )}
+          <input value={address} onChange={(e) => setAddress(e.target.value)} type={channel === "email" ? "email" : "tel"} autoComplete={channel === "email" ? "email" : "tel"} placeholder={channel === "email" ? "you@example.com" : "+52 55 1234 5678"} className="input h-10 min-w-0 flex-1" />
+          <button type="button" className="btn-secondary h-10" disabled={busy || address.trim().length < 3} onClick={() => step(async () => {
+            const { requestSponsorCode } = await import("@/lib/protocol/client");
+            setSentTo((await requestSponsorCode(channel, address)).sentTo);
+          })}>{busy ? <Loader2 size={16} className="animate-spin" /> : "Send code"}</button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-faint">Code sent to {sentTo}</span>
+          <input value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" placeholder="123456" className="input h-10 w-28 font-mono" />
+          <button type="button" className="btn-primary h-10" disabled={busy || code.length !== 6} onClick={() => step(async () => {
+            const { confirmSponsorCode } = await import("@/lib/protocol/client");
+            await confirmSponsorCode(code);
+            setNote({ ok: true, text: "Confirmed. Your Connect ID fees are sponsored." });
+            await onDone();
+          })}>{busy ? <Loader2 size={16} className="animate-spin" /> : "Confirm"}</button>
+          <button type="button" className="text-xs underline" disabled={busy} onClick={() => { setSentTo(null); setCode(""); }}>Use a different {channel === "email" ? "email" : "number"}</button>
+        </div>
+      )}
+      {note && <p role="status" className={note.ok ? "text-sm" : "text-sm text-danger"}>{note.text}</p>}
+      <p className="text-xs text-faint">Or skip this and send your signed request from any wallet with a little MON.</p>
+    </div>
   );
 }

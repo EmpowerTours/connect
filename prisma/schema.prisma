@@ -592,12 +592,42 @@ model GraphEvent {
 /// Why an account may get sponsored protocol gas (design section 6): it joined through an
 /// invite link, or passed a one-time phone or email check. No row = the member self-pays.
 model ProtocolSponsorship {
-  userId    String   @id
+  userId       String   @id
   /// "invite" or "verified"
-  source    String
+  source       String
   /// For invite signups: the inviter's user id (limited to 20 sponsored signups a day).
-  inviterId String?
-  createdAt DateTime @default(now())
+  inviterId    String?
+  /// For verified grants: "email" or "phone".
+  channel      String?
+  /// HMAC of the normalized email or phone (src/lib/protocol/sponsor/identity.ts). Unique, so one
+  /// email or phone grants sponsorship to one account only. The raw address is never stored.
+  identityHash String?  @unique
+  createdAt    DateTime @default(now())
+
+  @@index([inviterId, createdAt])
+}
+
+/// One-time code sent to an email or phone to earn sponsored gas. Only hashes are stored.
+model ProtocolSponsorCheck {
+  id           String   @id @default(cuid())
+  userId       String
+  /// "email" or "phone"
+  channel      String
+  /// HMAC of the normalized address (same as ProtocolSponsorship.identityHash).
+  identityHash String
+  /// HMAC of the code, bound to this row's id.
+  codeHash     String
+  /// HMAC of the client IP.
+  ipHash       String?
+  attempts     Int      @default(0)
+  /// open | verified | superseded | failed | locked
+  status       String
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([identityHash, createdAt])
+  @@index([ipHash, createdAt])
 }
 
 /// Ledger of every transaction the protocol relayer committed to pay for. The daily cap and the

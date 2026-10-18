@@ -40,6 +40,8 @@ export interface ClientConfig {
   longDelaySeconds: number;
   devBuild: boolean;
   sponsorship: boolean;
+  /** Ways to earn sponsored fees besides an invite link. */
+  sponsorChannels: ("email" | "phone")[];
 }
 
 export interface MeKey {
@@ -105,6 +107,22 @@ export function fetchProtocolConfig(): Promise<ClientConfig | null> {
 
 export function fetchMe(deviceHash?: Hex | null): Promise<Me | null> {
   return getJson<Me>(`/api/v1/protocol/me${deviceHash ? `?device=${deviceHash}` : ""}`);
+}
+
+/** Sends a one-time code; returns the masked address it went to. */
+export async function requestSponsorCode(channel: "email" | "phone", address: string): Promise<{ sentTo: string }> {
+  const { res, json } = await post("/api/v1/protocol/sponsor/start", { channel, address });
+  if (!res.ok) throw new Error(String(json.error ?? "could not send the code"));
+  return { sentTo: String(json.sentTo) };
+}
+
+/** Confirms the code; on success the member's sign-up fees are sponsored. */
+export async function confirmSponsorCode(code: string): Promise<void> {
+  const { res, json } = await post("/api/v1/protocol/sponsor/verify", { code });
+  if (!res.ok) {
+    const left = typeof json.attemptsLeft === "number" ? ` (${json.attemptsLeft} tries left)` : "";
+    throw new Error(`${String(json.error ?? "could not check the code")}${left}`);
+  }
 }
 
 export async function thisDeviceKey(cfg: ClientConfig, wallet: string): Promise<DeviceKey | null> {
