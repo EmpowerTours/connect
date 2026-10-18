@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BadgeCheck, ExternalLink, Lock, MapPin, Newspaper, Plus, ShieldQuestion, Users } from "lucide-react";
 import { addToPipelineAction, toggleFollowOrgAction } from "@/app/actions";
+import { updateOrgLogoAction } from "@/app/claim-actions";
 import { OrgLogo, UserAvatar } from "@/components/avatar";
 import { avatarUrl } from "@/lib/media";
 import { ClaimPanel } from "@/components/claim-panel";
@@ -9,14 +10,16 @@ import { DemoBadge } from "@/components/badges";
 import { OrgFacts, PrivateDealPanel } from "@/components/deal-panel";
 import { EmptyState } from "@/components/empty-state";
 import { Columns, PageHeader, Tabs } from "@/components/layout";
+import { PhotoPicker } from "@/components/photo-picker";
 import { PostCard } from "@/components/post-card";
 import { SubmitButton } from "@/components/submit-button";
 import { timeAgo } from "@/components/time";
-import { getLocale, getWorkspace, requireUser } from "@/lib/auth";
+import { currentUserIsAdmin, getLocale, getWorkspace, requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getOrgPosts } from "@/lib/feed";
 import { ORG_TYPE_LABELS, REGION_LABELS, t } from "@/lib/i18n";
 import { parseList } from "@/lib/json";
+import { isOnboardingError } from "@/lib/onboarding";
 import { isStage } from "@/lib/pipeline";
 import { getPostCtx } from "@/lib/post-ctx";
 import { getScoutProvider } from "@/lib/scout";
@@ -28,7 +31,7 @@ export default async function OrgPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ tab?: string; scoutError?: string; claim?: string; claimError?: string }>;
+  searchParams: Promise<{ tab?: string; scoutError?: string; claim?: string; claimError?: string; logoSaved?: string; logoError?: string }>;
 }) {
   const { slug } = await params;
   const sp = await searchParams;
@@ -49,6 +52,8 @@ export default async function OrgPage({
   });
   if (!org) notFound();
   const myClaim = await prisma.orgClaim.findUnique({ where: { userId_orgId: { userId: user.id, orgId: org.id } } });
+  const canEditLogo = myClaim?.status === "approved" || (await currentUserIsAdmin());
+  const logoError = sp.logoError ? (sp.logoError === "not_allowed" ? t(locale, "org.logo.not_allowed") : isOnboardingError(sp.logoError) ? t(locale, `onb.err.${sp.logoError}`) : t(locale, "orgs.err.generic")) : null;
   const verifiedMembers = org.claims;
   const deal = await prisma.deal.findUnique({
     where: { workspaceId_orgId: { workspaceId: ws.id, orgId: org.id } },
@@ -79,7 +84,7 @@ export default async function OrgPage({
         <div className="px-4 pb-4">
           <div className="-mt-10 flex items-end justify-between gap-3">
             <span className="rounded-[22px] ring-4 ring-bg">
-              <OrgLogo slug={org.slug} name={org.name} size={84} />
+              <OrgLogo slug={org.slug} name={org.name} size={84} src={avatarUrl(org.logoKey)} />
             </span>
             <div className="flex flex-wrap justify-end gap-2 pb-1">
               {deal ? (
@@ -186,6 +191,24 @@ export default async function OrgPage({
         <div className="p-4">
           <OrgFacts org={org} locale={locale} />
           <p className="mt-3 px-1 text-xs text-faint">{t(locale, "org.factsNote")}</p>
+          {canEditLogo && (
+            <section id="logo" className="card mt-4 scroll-mt-20 p-4" data-testid="org-logo-form">
+              <h3 className="mb-1 font-semibold">{t(locale, "org.logo.title")}</h3>
+              <p className="mb-3 text-[12.5px] text-faint">{t(locale, "org.logo.hint")}</p>
+              {sp.logoSaved && <p role="status" className="mb-3 rounded-xl bg-accent-soft p-3 text-sm font-medium text-accent-ink">{t(locale, "org.logo.saved")}</p>}
+              {logoError && <p role="alert" className="mb-3 rounded-xl bg-danger/10 p-3 text-sm text-danger">{logoError}</p>}
+              <form action={updateOrgLogoAction} className="space-y-3">
+                <input type="hidden" name="orgId" value={org.id} />
+                <PhotoPicker square current={avatarUrl(org.logoKey)} fallback={<OrgLogo slug={org.slug} name={org.name} size={84} />} label={t(locale, "org.logo.change")} hint={t(locale, "orgs.request.logoHint")} />
+                {org.logoKey && (
+                  <label className="flex items-center gap-2 text-[13px] text-muted">
+                    <input type="checkbox" name="removeLogo" className="h-4 w-4 accent-[#7c3aed]" /> {t(locale, "org.logo.remove")}
+                  </label>
+                )}
+                <SubmitButton className="btn-primary">{t(locale, "org.logo.save")}</SubmitButton>
+              </form>
+            </section>
+          )}
         </div>
       )}
 

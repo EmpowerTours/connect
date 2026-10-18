@@ -7,6 +7,7 @@ import { PhotoPicker } from "@/components/photo-picker";
 import { SubmitButton } from "@/components/submit-button";
 import { VerifiedOnMonad } from "@/components/wallet-badge";
 import { getLocale, requireUser } from "@/lib/auth";
+import { isGeneratedPlaceholder, isPlaceholderName } from "@/lib/handles";
 import { APP_NAME } from "@/lib/brand";
 import { ORG_TYPES, REGIONS } from "@/lib/constants";
 import { prisma } from "@/lib/db";
@@ -85,7 +86,26 @@ function StepYou({ user, locale }: { user: U; locale: Locale }) {
       </div>
       <label className={field}>
         <span className="label">{t(locale, "onb.name")}</span>
-        <input name="name" defaultValue={user.name} required maxLength={80} autoComplete="name" className="input" />
+        <input name="name" defaultValue={isPlaceholderName(user.name) ? "" : user.name} required maxLength={80} autoComplete="name" className="input" />
+      </label>
+      <label className={field}>
+        <span className="label">{t(locale, "handle.label")}</span>
+        <span className="relative block">
+          <AtSign size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-faint" />
+          <input
+            name="handle"
+            defaultValue={isGeneratedPlaceholder(user) ? "" : user.handle}
+            maxLength={25}
+            pattern="@?[A-Za-z0-9_]{2,24}"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            className="input pl-10"
+            placeholder={t(locale, "handle.placeholder")}
+            data-testid="onb-handle"
+          />
+        </span>
+        <span className="mt-1.5 block text-[12px] text-faint">{t(locale, isGeneratedPlaceholder(user) ? "handle.hintAuto" : "handle.hint")}</span>
       </label>
       <label className={field}>
         <span className="label">{t(locale, "onb.headline")}</span>

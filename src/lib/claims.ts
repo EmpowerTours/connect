@@ -79,3 +79,30 @@ export function validateOrgRequest(
   if (existing.some((o) => o.slug === slug || o.name.toLowerCase() === name.toLowerCase())) return { ok: false, error: "exists" };
   return { ok: true, value: { name, website: site.value, type: input.type || "fintech", slug } };
 }
+
+export type OrgApprovalPlan =
+  | { kind: "create"; value: { name: string; website: string; type: string; slug: string } }
+  | { kind: "link"; orgId: string; name: string }
+  | { kind: "invalid"; error: Exclude<OrgRequestError, "exists"> };
+
+/**
+ * What approving an org request does. A request whose name (or slug) already belongs to an
+ * organization, e.g. one added while the request waited, is linked to that organization instead
+ * of failing: the requester ends up attached to the same org either way.
+ */
+export function planOrgApproval(
+  req: { name: string; website: string; type: string },
+  existing: { id: string; slug: string; name: string }[],
+): OrgApprovalPlan {
+  const v = validateOrgRequest(req, []);
+  if (!v.ok) return { kind: "invalid", error: v.error as Exclude<OrgRequestError, "exists"> };
+  const hit = existing.find((o) => o.slug === v.value.slug || o.name.toLowerCase() === v.value.name.toLowerCase());
+  return hit ? { kind: "link", orgId: hit.id, name: hit.name } : { kind: "create", value: v.value };
+}
+
+/** Only the requester may edit a request, and only while it is pending. */
+export function canEditOrgRequest(req: { userId: string; status: string }, userId: string): { ok: true } | { ok: false; error: "not_yours" | "not_pending" } {
+  if (req.userId !== userId) return { ok: false, error: "not_yours" };
+  if (req.status !== "pending") return { ok: false, error: "not_pending" };
+  return { ok: true };
+}

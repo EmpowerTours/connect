@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { adminWallets, isAdmin } from "@/lib/admin";
-import { applyClaimAction, canClaim, validateClaimInput, validateOrgRequest } from "@/lib/claims";
+import { applyClaimAction, canClaim, canEditOrgRequest, planOrgApproval, validateClaimInput, validateOrgRequest } from "@/lib/claims";
 import { linkLabel, normalizeLinkedIn, normalizeWebUrl, normalizeXHandle } from "@/lib/links";
 
 const W = "0x" + "ab".repeat(20);
@@ -89,5 +89,44 @@ describe("links", () => {
     expect(normalizeLinkedIn("https://linkedin.com/feed").ok).toBe(false);
     expect(normalizeLinkedIn("https://notlinkedin.com/in/ana").ok).toBe(false);
     expect(linkLabel("https://www.linkedin.com/in/ana")).toBe("linkedin.com/in/ana");
+  });
+});
+
+describe("approving org requests", () => {
+  const orgs = [
+    { id: "o1", slug: "bitso", name: "Bitso" },
+    { id: "o2", slug: "empowertours", name: "EmpowerTours" },
+  ];
+
+  it("creates a new org when the name is free", () => {
+    expect(planOrgApproval({ name: " Acme  Pay ", website: "acme.example", type: "bank" }, orgs)).toEqual({
+      kind: "create",
+      value: { name: "Acme Pay", website: "https://acme.example", type: "bank", slug: "acme-pay" },
+    });
+  });
+
+  it("links to the org instead of failing when it was added while the request waited (the production 500)", () => {
+    // The request was filed in onboarding; the same org was then added from the Organizations page.
+    expect(planOrgApproval({ name: "EmpowerTours", website: "", type: "fintech" }, orgs)).toEqual({ kind: "link", orgId: "o2", name: "EmpowerTours" });
+    expect(planOrgApproval({ name: "empowertours", website: "", type: "" }, orgs)).toEqual({ kind: "link", orgId: "o2", name: "EmpowerTours" });
+    // Same slug, different spelling.
+    expect(planOrgApproval({ name: "Empower-Tours", website: "", type: "" }, [{ id: "o3", slug: "empower-tours", name: "Empower Tours" }])).toEqual({
+      kind: "link",
+      orgId: "o3",
+      name: "Empower Tours",
+    });
+  });
+
+  it("reports a request that is invalid on its own", () => {
+    expect(planOrgApproval({ name: "", website: "", type: "" }, orgs)).toEqual({ kind: "invalid", error: "name_empty" });
+    expect(planOrgApproval({ name: "Acme", website: "ftp://x.y", type: "" }, orgs)).toEqual({ kind: "invalid", error: "website" });
+    expect(planOrgApproval({ name: "Acme", website: "", type: "spaceship" }, orgs)).toEqual({ kind: "invalid", error: "type" });
+  });
+
+  it("only the requester edits a request, and only while it is pending", () => {
+    expect(canEditOrgRequest({ userId: "u1", status: "pending" }, "u1")).toEqual({ ok: true });
+    expect(canEditOrgRequest({ userId: "u1", status: "pending" }, "u2")).toEqual({ ok: false, error: "not_yours" });
+    expect(canEditOrgRequest({ userId: "u1", status: "approved" }, "u1")).toEqual({ ok: false, error: "not_pending" });
+    expect(canEditOrgRequest({ userId: "u1", status: "rejected" }, "u1")).toEqual({ ok: false, error: "not_pending" });
   });
 });

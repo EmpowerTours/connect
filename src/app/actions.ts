@@ -15,10 +15,11 @@ import { ingestAllFeeds } from "@/lib/ingest";
 import { parseList, toList } from "@/lib/json";
 import { canTransition, isStage } from "@/lib/pipeline";
 import { getScoutProvider } from "@/lib/scout";
-import { slugify } from "@/lib/slug";
 import { extractCashtags, matchOrgs } from "@/lib/tagging";
 import { applyIntroAction, validateIntroRequest, type IntroAction } from "@/lib/intros";
 import { extractMentions, isPostKind, threadIdsFor, validatePostBody } from "@/lib/posts";
+import { isPlaceholderName, normalizeHandle, validateHandle } from "@/lib/handles";
+import { isUniqueViolation } from "@/lib/db-errors";
 
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
 
@@ -54,7 +55,6 @@ export async function setLocaleAction(fd: FormData) {
 
 const profileSchema = z.object({
   name: z.string().min(1).max(80),
-  handle: z.string().regex(/^[a-z0-9_]{2,24}$/),
   role: z.string().max(80),
   orgName: z.string().max(80),
   bio: z.string().max(400),
@@ -65,9 +65,8 @@ const profileSchema = z.object({
 
 export async function updateProfileAction(fd: FormData) {
   const user = await requireUser();
-  const data = profileSchema.parse({
+  const parsed = profileSchema.safeParse({
     name: str(fd, "name"),
-    handle: str(fd, "handle").toLowerCase(),
     role: str(fd, "role"),
     orgName: str(fd, "orgName"),
     bio: str(fd, "bio"),
@@ -75,12 +74,30 @@ export async function updateProfileAction(fd: FormData) {
     location: str(fd, "location"),
     locale: str(fd, "locale") || "en",
   });
-  const clash = await prisma.user.findFirst({ where: { handle: data.handle, NOT: { id: user.id } } });
-  if (clash) redirect("/profile?error=handle");
+  if (!parsed.success) redirect(`/profile?error=${str(fd, "name") ? "name_long" : "name_empty"}`);
+  const data = parsed.data;
+  if (isPlaceholderName(data.name)) redirect("/profile?error=name_empty");
+  // Keeping the current handle is always allowed (even a legacy one); a new one must be valid and free.
+  const raw = normalizeHandle(str(fd, "handle"));
+  let handle = user.handle;
+  if (raw !== user.handle) {
+    const h = validateHandle(raw);
+    if (!h.ok) redirect(`/profile?error=${h.error}`);
+    handle = h.value;
+  }
+  if (handle !== user.handle && (await prisma.user.findFirst({ where: { handle, NOT: { id: user.id } }, select: { id: true } }))) {
+    redirect("/profile?error=handle_taken");
+  }
   const org = data.orgName ? await prisma.organization.findFirst({ where: { name: data.orgName } }) : null;
-  await prisma.user.update({ where: { id: user.id }, data: { ...data, headline: data.role, orgId: org?.id ?? null } });
+  try {
+    await prisma.user.update({ where: { id: user.id }, data: { ...data, handle, headline: data.role, orgId: org?.id ?? null } });
+  } catch (e) {
+    // Someone took the handle between the check and the write (unique index).
+    if (isUniqueViolation(e)) redirect("/profile?error=handle_taken");
+    throw e;
+  }
   revalidatePath("/", "layout");
-  redirect(`/u/${data.handle}?saved=1`);
+  redirect(`/u/${handle}?saved=1`);
 }
 
 export async function toggleFollowOrgAction(fd: FormData) {
@@ -105,20 +122,6 @@ export async function toggleFollowUserAction(fd: FormData) {
 }
 
 /* ---------- organizations ---------- */
-
-export async function createOrgAction(fd: FormData) {
-  await requireUser();
-  const name = str(fd, "name");
-  const type = str(fd, "type");
-  if (!name || !(ORG_TYPES as readonly string[]).includes(type)) redirect("/directory?error=org");
-  let slug = slugify(name) || "org";
-  if (await prisma.organization.findUnique({ where: { slug } })) slug = `${slug}-${Date.now().toString(36)}`;
-  const country = str(fd, "country").toUpperCase().slice(0, 2);
-  await prisma.organization.create({
-    data: { slug, name, type, country, region: regionForCountry(country), website: str(fd, "website") },
-  });
-  redirect(`/orgs/${slug}`);
-}
 
 export async function updateOrgAction(fd: FormData) {
   await requireUser();

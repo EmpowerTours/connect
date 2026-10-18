@@ -56,9 +56,22 @@ export function UserAvatar({ name, seed, size = 40, ring = false, src }: { name:
   );
 }
 
-/** Org logo from favicon cache (npm run logos) or an initials tile. */
-export function OrgLogo({ slug, name, size = 40 }: { slug: string; name: string; size?: number }) {
+/** Org logo: an uploaded logo (`src`, see avatarUrl), else the favicon cache (npm run logos), else an initials tile. */
+export function OrgLogo({ slug, name, size = 40, src }: { slug: string; name: string; size?: number; src?: string | null }) {
   const radius = Math.round(size * 0.24);
+  if (src) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- uploads are already resized to 512px WebP
+      <img
+        src={src}
+        alt=""
+        width={size}
+        height={size}
+        className="shrink-0 border border-line bg-white object-cover"
+        style={{ width: size, height: size, borderRadius: radius }}
+      />
+    );
+  }
   if (LOGOS.has(slug)) {
     return (
       <span className="inline-flex shrink-0 items-center justify-center overflow-hidden border border-line bg-white" style={{ width: size, height: size, borderRadius: radius }}>

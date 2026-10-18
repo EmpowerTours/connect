@@ -6,6 +6,9 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { canClaim, validateOrgRequest } from "@/lib/claims";
 import { prisma } from "@/lib/db";
+import { isUniqueViolation } from "@/lib/db-errors";
+import { isPlaceholderName } from "@/lib/handles";
+import { chooseHandle } from "@/lib/handles-db";
 import { toList } from "@/lib/json";
 import { resolveOrgChoice, validateBasics, validateFocus, validateLinks } from "@/lib/onboarding";
 import { validateOpportunity } from "@/lib/opportunities";
@@ -15,12 +18,20 @@ import { processAvatar } from "@/lib/uploads";
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
 const step = (s: string, error?: string) => `/welcome?step=${s}${error ? `&error=${error}` : ""}`;
 
-/** Step 1: name + headline. */
+/** Step 1: name + headline (+ handle). */
 export async function saveBasicsAction(fd: FormData) {
   const user = await requireUser();
   const r = validateBasics({ name: str(fd, "name"), headline: str(fd, "headline") });
   if (!r.ok) redirect(step("you", r.error));
-  await prisma.user.update({ where: { id: user.id }, data: { name: r.value.name, headline: r.value.headline, role: r.value.headline } });
+  if (isPlaceholderName(r.value.name)) redirect(step("you", "name_empty"));
+  const h = await chooseHandle(user, str(fd, "handle"), r.value.name);
+  if (!h.ok) redirect(step("you", h.error));
+  try {
+    await prisma.user.update({ where: { id: user.id }, data: { name: r.value.name, handle: h.handle, headline: r.value.headline, role: r.value.headline } });
+  } catch (e) {
+    if (isUniqueViolation(e)) redirect(step("you", "handle_taken"));
+    throw e;
+  }
   redirect(step("org"));
 }
 

@@ -2,13 +2,14 @@ import Link from "next/link";
 import { Building2, Check, EyeOff, ExternalLink, Flag, Inbox, ShieldCheck, X } from "lucide-react";
 import { adminDecideClaimAction, adminDecideOrgRequestAction } from "@/app/claim-actions";
 import { adminDecideReportAction, adminSetOpportunityHiddenAction } from "@/app/moderation-actions";
-import { UserAvatar } from "@/components/avatar";
+import { OrgLogo, UserAvatar } from "@/components/avatar";
 import { EmptyState } from "@/components/empty-state";
 import { TabPage } from "@/components/layout";
 import { SubmitButton } from "@/components/submit-button";
 import { timeAgo } from "@/components/time";
 import { VerifiedOnMonad } from "@/components/wallet-badge";
 import { getLocale, requireAdmin } from "@/lib/auth";
+import { planOrgApproval } from "@/lib/claims";
 import { prisma } from "@/lib/db";
 import { ORG_TYPE_LABELS, t, type Locale } from "@/lib/i18n";
 import { linkLabel } from "@/lib/links";
@@ -20,7 +21,10 @@ export const metadata = { title: "Admin" };
 
 type Tab = "claims" | "orgs" | "reports";
 
-export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+const DONE = ["approved", "linked", "rejected"] as const;
+const ERRORS = ["name_empty", "name_long", "website", "type"] as const;
+
+export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string; done?: string; error?: string }> }) {
   await requireAdmin();
   const locale = await getLocale();
   const raw = (await searchParams).tab;
@@ -37,6 +41,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       prisma.report.groupBy({ by: ["targetType", "targetId"], where: { status: "open" } }).then((g) => g.length),
     ]),
   ]);
+  const sp = await searchParams;
+  const knownOrgs = tab === "orgs" && requests.length ? await prisma.organization.findMany({ select: { id: true, slug: true, name: true } }) : [];
+  const doneText =
+    sp.done && (DONE as readonly string[]).includes(sp.done) ? t(locale, `admin.done.${sp.done as (typeof DONE)[number]}`) : sp.done?.startsWith("already_") ? t(locale, "admin.done.already") : null;
+  const errorText = sp.error ? t(locale, "admin.err").replace("{error}", (ERRORS as readonly string[]).includes(sp.error) ? t(locale, `orgs.err.${sp.error as (typeof ERRORS)[number]}`) : "?") : null;
   const reported = tab === "reports" ? await loadReports() : { groups: [], hidden: [] };
   const tabs: { key: Tab; label: string; n: number }[] = [
     { key: "claims", label: t(locale, "admin.claims"), n: counts[0] },
@@ -62,6 +71,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           </Link>
         ))}
       </nav>
+
+      {doneText && <p role="status" className="mt-4 rounded-xl bg-accent-soft p-3 text-sm font-medium text-accent-ink">{doneText}</p>}
+      {errorText && <p role="alert" className="mt-4 rounded-xl bg-danger/10 p-3 text-sm text-danger">{errorText}</p>}
 
       {tab === "claims" &&
         (claims.length === 0 ? (
@@ -102,17 +114,26 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <EmptyState icon={Building2} title={t(locale, "admin.noRequests")} body={t(locale, "admin.noRequestsBody")} />
         ) : (
           <ul className="mt-4 space-y-3">
-            {requests.map((r) => (
-              <li key={r.id} className="glass p-4">
-                <p className="text-[15px] font-semibold">{r.name}</p>
+            {requests.map((r) => {
+              const plan = planOrgApproval(r, knownOrgs);
+              return (
+              <li key={r.id} className="glass p-4" data-testid="admin-org-request">
+                <div className="flex items-center gap-3">
+                  <OrgLogo slug="" name={r.name} size={44} src={avatarUrl(r.logoKey)} />
+                  <p className="min-w-0 flex-1 text-[15px] font-semibold">{r.name}</p>
+                </div>
                 <p className="mt-0.5 text-[13px] text-faint">
                   {ORG_TYPE_LABELS[locale][r.type] ?? r.type} · {t(locale, "admin.requestedBy")} <Link href={`/u/${r.user.handle}`} className="text-accent-ink hover:underline">{r.user.name}</Link> · {timeAgo(r.createdAt, locale)}
                 </p>
                 {r.website && <a href={r.website} target="_blank" rel="noreferrer nofollow" className="mt-1 inline-flex items-center gap-1 text-[13px] text-accent hover:underline">{linkLabel(r.website)} <ExternalLink size={11} /></a>}
                 {r.note && <p className="mt-2 text-[13px] text-muted">{r.note}</p>}
+                {plan.kind === "link" && (
+                  <p className="mt-2 rounded-xl bg-accent-soft/70 px-3 py-2 text-[13px] text-accent-ink" data-testid="admin-req-links">{t(locale, "admin.reqLinks").replace("{name}", plan.name)}</p>
+                )}
                 <Decide action={adminDecideOrgRequestAction} idName="requestId" id={r.id} locale={locale} />
               </li>
-            ))}
+              );
+            })}
           </ul>
         ))}
       {tab === "reports" && (

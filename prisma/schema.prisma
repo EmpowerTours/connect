@@ -136,6 +136,8 @@ model OrgRequest {
   website   String    @default("")
   type      String    @default("")
   note      String    @default("")
+  /// Storage key of the logo the requester uploaded (avatars/<id>.webp); copied to the org on approval.
+  logoKey   String?
   /// pending | approved | rejected
   status    String    @default("pending")
   /// The organization created on approval.
@@ -178,6 +180,8 @@ model Organization {
   /// JSON string[]
   chainsEvaluating String   @default("[]")
   notes            String   @default("")
+  /// Storage key of an uploaded logo (avatars/<id>.webp). Null = favicon cache or initials.
+  logoKey          String?
   /// Placeholder: org verification (domain / admin claim) not implemented yet.
   verified         Boolean  @default(false)
   createdAt        DateTime @default(now())
