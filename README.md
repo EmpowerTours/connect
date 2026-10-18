@@ -8,12 +8,44 @@ Mobile-first and calm: three tabs. **Today** greets you, shows one insight from 
 
 > Runs fully locally for development (embedded Postgres, no Docker, no external services). Production runs on Railway; see [Production (Railway)](#production-railway). The product name, host and canonical URL live in one constant: `BRAND` in `src/lib/brand.ts` (rename there; everything user-facing derives from it).
 
+## Fork it in under an hour
+Connect is open source (AGPL-3.0, see [License](#license)) and built to be copied: fork it, rename it, and run your own network for a niche (Monad builders, LatAm fintechs, a single ecosystem…). A fresh clone runs locally with **one command and no accounts**: Postgres is embedded (an npm dependency), so there is no Docker or database to install.
+
+**You need:** Node.js 20 or newer (`node -v`), npm and git, on macOS, Linux or Windows (x64 or arm64). About 1 GB of disk for dependencies.
+
+1. **Fork and clone** (about 2 minutes):
+   ```bash
+   git clone https://github.com/<you>/connect.git
+   cd connect
+   ```
+2. **Install** (about 2-4 minutes; also runs `prisma generate`):
+   ```bash
+   npm install
+   ```
+3. **Run everything** (about 1 minute the first time):
+   ```bash
+   npm run dev:all
+   ```
+   This creates `.env` from `.env.example`, starts the embedded PostgreSQL on `127.0.0.1:54329` (data in `.data/postgres`), applies the migrations, seeds the public organizations, feeds and channels plus a clearly labelled fictional demo network, and starts the app. Use `npm run dev:all -- --no-demo` for an empty network, or `npm run setup:local` to prepare the database without starting the app.
+4. **Open http://localhost:3000** and choose **Continue as demo user**. Ctrl+C stops the app and the database.
+5. **Check your fork is healthy**:
+   ```bash
+   npm test           # unit tests, no database needed
+   npm run typecheck
+   npm run lint
+   npm run build
+   ```
+6. **Make it yours** (10-20 minutes): rename the product in `src/lib/brand.ts` (name, host, ecosystem; everything user-facing derives from it), edit the organizations in `prisma/seed-data.ts` (public facts only) and the topic channels in `prisma/seed-base.ts`, and the fictional demo people in `prisma/seed-social.ts`. Re-run `npm run dev:all`.
+7. **Deploy** (20-30 minutes): follow [docs/deploy-railway.md](docs/deploy-railway.md). Production sign-in uses Mera passkey wallets bound to a domain you control, so read its "Forking for your own domain" section first; the production boot check refuses to start until the passkey domain constants match yours.
+
+Troubleshooting: if port 54329 is taken, set `LOCAL_PG_PORT` and update `DATABASE_URL` in `.env` to match. To start over, stop the app and delete `.data/postgres`. To use an existing Postgres instead, point `DATABASE_URL` in `.env` at it and run `npm run setup && npm run dev`.
+
 ## Stack
 Next.js 15 (App Router, server actions) · TypeScript · Tailwind CSS v4 · Prisma 6 + PostgreSQL (versioned migrations in `prisma/migrations`) · Vitest · rss-parser · zod.
 
 ## Run it
+One command: `npm install && npm run dev:all` (see [Fork it in under an hour](#fork-it-in-under-an-hour)). The same steps by hand:
 ```bash
-cd bdnet
 npm install            # also runs prisma generate
 cp .env.example .env   # only DATABASE_URL is needed (already points at the local Postgres)
 npm run db:start       # embedded Postgres on 127.0.0.1:54329, data in .data/postgres; keep it running
@@ -65,6 +97,7 @@ prisma/seed.ts            default/production seed (orgs, feeds, channels; no peo
 prisma/seed-base.ts       the data that seed applies
 prisma/seed-demo.ts       LOCAL ONLY demo seed (demo user, pipeline, demo network)
 prisma/seed-social.ts     fictional demo network: users, channels, updates, intros, asks/offers
+scripts/dev-all.ts        one-command local dev (embedded Postgres, migrate, seed, next dev)
 scripts/fetch-logos.ts    favicon fetcher → public/logos
 scripts/ingest.ts         RSS ingestion CLI
 scripts/screenshots.ts    headless screenshots
@@ -135,7 +168,7 @@ Photos are sniffed by magic bytes (JPEG, PNG or WebP only), capped at 5 MB, at l
 Either way photos are served with a strict content-type and CSP.
 
 ## Production (Railway)
-Step-by-step launch guide (accounts, variables, domain, R2, first admin, costs): `connect-launch.md` in the workspace root, kept outside the repo.
+Step-by-step launch guide (accounts, variables, domain, R2, first admin, costs, forking for your own domain): [docs/deploy-railway.md](docs/deploy-railway.md).
 
 - **Build:** `Dockerfile` (multi-stage, Node 20, Next `output: "standalone"`). `NEXT_PUBLIC_RP_ID` is inlined at build time, so it must be set as a Railway variable before the first build.
 - **Start:** `node start.mjs` (`scripts/start.mjs`) runs `prisma migrate deploy`, optionally the base seed (`SEED_ON_BOOT=1`, first deploy only), then the standalone server. `NODE_OPTIONS=--max-old-space-size=256` caps the heap, leaving room in a ~384 MB container for native memory (sharp runs with its cache off and one thread); the server idles around 150 MB RSS. The image runs under `tini` (ENTRYPOINT, and the Railway start command `/usr/bin/tini -- node start.mjs`) so SIGTERM reaches Node: the Next server drains in-flight requests and exits, with an 8 s cap (`SHUTDOWN_GRACE_MS`).
@@ -147,3 +180,17 @@ Step-by-step launch guide (accounts, variables, domain, R2, first admin, costs):
 - **Security headers:** nonce-based CSP with `strict-dynamic` for pages (`src/middleware.ts`), plus HSTS, `nosniff`, `X-Frame-Options: DENY`, a strict referrer policy and a Permissions-Policy that only allows passkeys on this origin (`src/lib/security-headers.ts`). Session and locale cookies are `Secure` in production.
 - **News ingest without a cron:** when someone opens Today or Signals and the feeds are older than 6 hours, one ingest runs in the background after the response (a shared claim in Redis keeps it to one run per 30 minutes across instances). Admins can refresh by hand on `/signals`. An external scheduler can call `POST /api/cron/ingest` with `Authorization: Bearer $CRON_SECRET`; without a 32+ character `CRON_SECRET` that route is a 404.
 
+## Contributing and security
+- Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
+- Found a vulnerability? Please report it privately: see [SECURITY.md](SECURITY.md).
+- Contributions are accepted under the contributor grant in [CONTRIBUTING.md](CONTRIBUTING.md#licensing-your-contribution).
+
+## License
+**GNU AGPL-3.0**: see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+Copyright © 2026 EmpowerTours S.A.S. de C.V.
+
+You may read, run, modify and redistribute this software. If you run a **modified** version as a network service, AGPL section 13 requires you to offer your users the complete corresponding source of your version under this same license. For a hosted web app that is the clause that matters: you may fork this and run your own network, but you may not fork it, close it, and compete.
+
+**Dual licensed.** AGPL-3.0 as above, or a **commercial license** from EmpowerTours S.A.S. de C.V. for anyone who wants to build on this without AGPL section 13's obligations, i.e. to run a modified version as a service with their own source closed. Enquiries: admin@empowertours.xyz
+
+No rights are granted to the EmpowerTours name or logo. Organization names and the favicons in `public/logos/` are trademarks of their respective owners, are included only to identify those organizations, and are not covered by either license.

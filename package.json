@@ -2,8 +2,11 @@
   "name": "bdnet",
   "version": "0.1.0",
   "private": true,
+  "license": "AGPL-3.0-only",
   "scripts": {
     "dev": "next dev",
+    "dev:all": "tsx scripts/dev-all.ts",
+    "setup:local": "tsx scripts/dev-all.ts --setup-only",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
