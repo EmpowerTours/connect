@@ -7,13 +7,13 @@ import { PhotoPicker } from "@/components/photo-picker";
 import { SubmitButton } from "@/components/submit-button";
 import { VerifiedOnMonad } from "@/components/wallet-badge";
 import { getLocale, requireUser } from "@/lib/auth";
+import { isPlaceholderHandle, isPlaceholderName } from "@/lib/handles";
 import { APP_NAME } from "@/lib/brand";
 import { ORG_TYPES, REGIONS } from "@/lib/constants";
 import { prisma } from "@/lib/db";
 import { ORG_TYPE_LABELS, REGION_LABELS, t, type Locale } from "@/lib/i18n";
 import { parseList } from "@/lib/json";
 import { avatarUrl } from "@/lib/media";
-import { isPlaceholderHandle, isPlaceholderName } from "@/lib/handles";
 import { FOCUS_TAGS, MAX_FOCUS_TAGS, ONBOARDING_STEPS, isFocusTag, isOnboardingError, type OnboardingStep } from "@/lib/onboarding";
 import { OPP_BODY_MAX, OPP_HEADLINE_MAX } from "@/lib/opportunities";
 

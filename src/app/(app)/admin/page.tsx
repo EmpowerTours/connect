@@ -9,9 +9,9 @@ import { SubmitButton } from "@/components/submit-button";
 import { timeAgo } from "@/components/time";
 import { VerifiedOnMonad } from "@/components/wallet-badge";
 import { getLocale, requireAdmin } from "@/lib/auth";
+import { planOrgApproval } from "@/lib/claims";
 import { prisma } from "@/lib/db";
 import { ORG_TYPE_LABELS, t, type Locale } from "@/lib/i18n";
-import { planOrgApproval } from "@/lib/claims";
 import { linkLabel } from "@/lib/links";
 import { avatarUrl } from "@/lib/media";
 import { isReportReason } from "@/lib/opportunities";
@@ -27,8 +27,7 @@ const ERRORS = ["name_empty", "name_long", "website", "type"] as const;
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string; done?: string; error?: string }> }) {
   await requireAdmin();
   const locale = await getLocale();
-  const sp = await searchParams;
-  const raw = sp.tab;
+  const raw = (await searchParams).tab;
   const tab: Tab = raw === "orgs" || raw === "reports" ? raw : "claims";
   const userSel = { id: true, name: true, handle: true, headline: true, avatarKey: true, walletVerified: true, walletAddress: true } as const;
   const [claims, requests, counts] = await Promise.all([
@@ -42,11 +41,12 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       prisma.report.groupBy({ by: ["targetType", "targetId"], where: { status: "open" } }).then((g) => g.length),
     ]),
   ]);
-  const reported = tab === "reports" ? await loadReports() : { groups: [], hidden: [] };
+  const sp = await searchParams;
   const knownOrgs = tab === "orgs" && requests.length ? await prisma.organization.findMany({ select: { id: true, slug: true, name: true } }) : [];
   const doneText =
     sp.done && (DONE as readonly string[]).includes(sp.done) ? t(locale, `admin.done.${sp.done as (typeof DONE)[number]}`) : sp.done?.startsWith("already_") ? t(locale, "admin.done.already") : null;
   const errorText = sp.error ? t(locale, "admin.err").replace("{error}", (ERRORS as readonly string[]).includes(sp.error) ? t(locale, `orgs.err.${sp.error as (typeof ERRORS)[number]}`) : "?") : null;
+  const reported = tab === "reports" ? await loadReports() : { groups: [], hidden: [] };
   const tabs: { key: Tab; label: string; n: number }[] = [
     { key: "claims", label: t(locale, "admin.claims"), n: counts[0] },
     { key: "orgs", label: t(locale, "admin.orgRequests"), n: counts[1] },
