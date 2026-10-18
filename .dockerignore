@@ -11,3 +11,5 @@ screenshots-tmp
 coverage
 *.tsbuildinfo
 npm-debug.log*
+# Solidity contracts are not part of the app image.
+contracts
