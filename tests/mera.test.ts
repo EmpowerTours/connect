@@ -273,14 +273,17 @@ describe("cookies", () => {
   });
 });
 
-function fakeDeps(users: AuthUserRef[] = []): AuthDeps & { users: AuthUserRef[] } {
+function fakeDeps(users: AuthUserRef[] = []): AuthDeps & { users: AuthUserRef[]; invites: (string | null)[] } {
+  const invites: (string | null)[] = [];
   return {
     users,
+    invites,
     verify: { store: new MemoryNonceStore() },
     findByWallet: async (w) => users.find((u) => u.walletAddress === w.toLowerCase()) ?? null,
-    createWithWallet: async ({ wallet, displayName }) => {
+    createWithWallet: async ({ wallet, displayName, inviteCode }) => {
       const u = { id: `u${users.length + 1}`, handle: handleFromName(displayName, new Set(users.map((x) => x.handle))), walletAddress: wallet };
       users.push(u);
+      invites.push(inviteCode);
       return u;
     },
     linkWallet: async ({ userId, wallet }) => {
@@ -304,6 +307,17 @@ describe("auth flows", () => {
 
     const again = await loginFlow((await signedLogin(account)).body, deps);
     expect(again).toMatchObject({ ok: true, status: 200, user: { handle: "ana_ruiz" } });
+  });
+
+  it("passes the invite code to account creation only on a successful sign-up", async () => {
+    const deps = fakeDeps();
+    const account = newAccount();
+    await registerFlow((await signedRegistration(account)).body, deps, { inviteCode: "abcd2345" });
+    expect(deps.invites).toEqual(["abcd2345"]);
+    // A rejected registration never reaches createWithWallet.
+    await registerFlow((await signedRegistration(account)).body, deps, { inviteCode: "zzzz9999" });
+    await registerFlow((await signedRegistration(newAccount())).body, deps);
+    expect(deps.invites).toEqual(["abcd2345", null]);
   });
 
   it("rejects bad payloads (400), bad signatures (401) and duplicate registration (409)", async () => {

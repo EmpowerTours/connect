@@ -3,7 +3,8 @@
  * The route handlers in src/app/api/auth/* are thin wrappers around these.
  *
  *   login    POST /api/auth/session   Session signature  -> 200 | 404 (no profile yet) | 401
- *   register POST /api/auth/register  Registration sig   -> 201 (profile created, wallet linked)
+ *   register POST /api/auth/register  Registration sig   -> 201 (profile created, wallet linked;
+ *                                     inviter recorded from the invite cookie, if any)
  *   link     POST /api/auth/link      Session sig with LINK_STATEMENT, while signed in
  *                                     (e.g. the local demo user) -> wallet linked to that profile
  */
@@ -20,7 +21,8 @@ export interface AuthUserRef {
 
 export interface AuthDeps {
   findByWallet(wallet: string): Promise<AuthUserRef | null>;
-  createWithWallet(args: { wallet: string; displayName: string; credentialId: string }): Promise<AuthUserRef>;
+  /** inviteCode: the code from an invite link (src/lib/invites.ts); unknown codes are ignored. */
+  createWithWallet(args: { wallet: string; displayName: string; credentialId: string; inviteCode: string | null }): Promise<AuthUserRef>;
   linkWallet(args: { userId: string; wallet: string; credentialId: string | null }): Promise<AuthUserRef>;
   verify?: VerifyOptions;
 }
@@ -44,14 +46,19 @@ export async function loginFlow(body: unknown, deps: AuthDeps): Promise<FlowResu
   return { ok: true, status: 200, user, wallet: v.address, credentialId: input.passkeyCredentialId ?? null };
 }
 
-export async function registerFlow(body: unknown, deps: AuthDeps): Promise<FlowResult> {
+export async function registerFlow(body: unknown, deps: AuthDeps, opts: { inviteCode?: string | null } = {}): Promise<FlowResult> {
   const input = parse(RegisterInput, body);
   if (!input) return { ok: false, status: 400, error: "invalid payload" };
   const v = await verifyRegistrationSignature(input, deps.verify);
   if (!v.ok) return { ok: false, status: 401, error: "invalid signature" };
   const existing = await deps.findByWallet(v.address);
   if (existing) return { ok: false, status: 409, error: "this wallet already has a profile — sign in instead" };
-  const user = await deps.createWithWallet({ wallet: v.address, displayName: input.displayName, credentialId: input.passkeyCredentialId });
+  const user = await deps.createWithWallet({
+    wallet: v.address,
+    displayName: input.displayName,
+    credentialId: input.passkeyCredentialId,
+    inviteCode: opts.inviteCode ?? null,
+  });
   return { ok: true, status: 201, user, wallet: v.address, credentialId: input.passkeyCredentialId };
 }
 

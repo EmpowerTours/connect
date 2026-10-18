@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "../db";
 import { handleFromName } from "../auth-core";
+import { findInviter } from "../invites-db";
 import type { AuthDeps, AuthUserRef } from "./flows";
 
 const select = { id: true, handle: true, walletAddress: true } as const;
@@ -9,8 +10,11 @@ const select = { id: true, handle: true, walletAddress: true } as const;
 export const prismaAuthDeps: AuthDeps = {
   findByWallet: (wallet) => prisma.user.findUnique({ where: { walletAddress: wallet.toLowerCase() }, select }),
 
-  async createWithWallet({ wallet, displayName, credentialId }): Promise<AuthUserRef> {
-    const taken = new Set((await prisma.user.findMany({ select: { handle: true } })).map((u) => u.handle));
+  async createWithWallet({ wallet, displayName, credentialId, inviteCode }): Promise<AuthUserRef> {
+    const [taken, inviter] = await Promise.all([
+      prisma.user.findMany({ select: { handle: true } }).then((rows) => new Set(rows.map((u) => u.handle))),
+      findInviter(inviteCode),
+    ]);
     const user = await prisma.user.create({
       data: {
         name: displayName,
@@ -20,6 +24,7 @@ export const prismaAuthDeps: AuthDeps = {
         walletVerifiedAt: new Date(),
         passkeyCredentialId: credentialId,
         verificationMethod: "mera",
+        ...(inviter ? { invitedById: inviter.id } : {}),
       },
       select,
     });

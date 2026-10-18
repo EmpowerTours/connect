@@ -18,9 +18,10 @@ export function SignInLink({ label, className, join = false }: { label: string; 
   );
 }
 
-/** Floating sign-up bar on public pages. */
+/** Floating sign-up bar on public pages. Not on "/", whose landing page has its own sign-up buttons. */
 export function JoinBar({ title, body, cta }: { title: string; body: string; cta: string }) {
   const path = usePathname();
+  if (path === "/") return null;
   return (
     <aside
       data-testid="join-bar"

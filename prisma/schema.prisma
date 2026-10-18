@@ -69,6 +69,11 @@ model User {
   /// X account id from the member's own X archive (account.js), recorded only
   /// when its username matches linkX. Self-declared, like linkX itself.
   xAccountId          String?
+  /// Personal invite link code (/i/<code>), created the first time the member opens it.
+  inviteCode          String?       @unique
+  /// Member whose invite link this account signed up through (src/lib/invites.ts).
+  invitedById         String?
+  invitedBy           User?         @relation("Invites", fields: [invitedById], references: [id], onDelete: SetNull)
   createdAt           DateTime      @default(now())
 
   likes            Like[]
@@ -97,9 +102,11 @@ model User {
   suggestedTo       ImportSuggestion[] @relation("SuggestionTarget")
   importRuns        ImportRun[]
   walletPackChecks  WalletPackCheck[]
+  invitees          User[]             @relation("Invites")
 
   @@index([farcasterFid])
   @@index([xAccountId])
+  @@index([invitedById])
 }
 
 /// A user's claim to work at an organization. Pending until an admin

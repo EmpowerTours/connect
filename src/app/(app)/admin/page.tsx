@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Building2, Check, EyeOff, ExternalLink, Flag, Inbox, ShieldCheck, X } from "lucide-react";
+import { Building2, Check, EyeOff, ExternalLink, Flag, Inbox, ShieldCheck, UserPlus, X } from "lucide-react";
 import { adminDecideClaimAction, adminDecideOrgRequestAction } from "@/app/claim-actions";
 import { adminDecideReportAction, adminSetOpportunityHiddenAction } from "@/app/moderation-actions";
 import { UserAvatar } from "@/components/avatar";
@@ -11,6 +11,7 @@ import { VerifiedOnMonad } from "@/components/wallet-badge";
 import { getLocale, requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ORG_TYPE_LABELS, t, type Locale } from "@/lib/i18n";
+import { inviteStats } from "@/lib/invites-db";
 import { linkLabel } from "@/lib/links";
 import { avatarUrl } from "@/lib/media";
 import { isReportReason } from "@/lib/opportunities";
@@ -18,13 +19,13 @@ import { isReportReason } from "@/lib/opportunities";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin" };
 
-type Tab = "claims" | "orgs" | "reports";
+type Tab = "claims" | "orgs" | "reports" | "invites";
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   await requireAdmin();
   const locale = await getLocale();
   const raw = (await searchParams).tab;
-  const tab: Tab = raw === "orgs" || raw === "reports" ? raw : "claims";
+  const tab: Tab = raw === "orgs" || raw === "reports" || raw === "invites" ? raw : "claims";
   const userSel = { id: true, name: true, handle: true, headline: true, avatarKey: true, walletVerified: true, walletAddress: true } as const;
   const [claims, requests, counts] = await Promise.all([
     tab === "claims"
@@ -38,10 +39,12 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     ]),
   ]);
   const reported = tab === "reports" ? await loadReports() : { groups: [], hidden: [] };
+  const invites = tab === "invites" ? await inviteStats() : null;
   const tabs: { key: Tab; label: string; n: number }[] = [
     { key: "claims", label: t(locale, "admin.claims"), n: counts[0] },
     { key: "orgs", label: t(locale, "admin.orgRequests"), n: counts[1] },
     { key: "reports", label: t(locale, "admin.reports"), n: counts[2] },
+    { key: "invites", label: t(locale, "admin.invites"), n: 0 },
   ];
 
   return (
@@ -173,6 +176,31 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           )}
         </>
       )}
+
+      {invites &&
+        (invites.total === 0 ? (
+          <EmptyState icon={UserPlus} title={t(locale, "admin.noInvites")} body={t(locale, "admin.noInvitesBody")} />
+        ) : (
+          <section className="mt-4" data-testid="admin-invites">
+            <dl className="grid grid-cols-3 gap-2.5">
+              <Stat label={t(locale, "admin.invitesTotal")} value={String(invites.total)} />
+              <Stat label={t(locale, "admin.invitesRecent")} value={String(invites.recent)} />
+              <Stat label={t(locale, "admin.invitesShare")} value={`${invites.members ? Math.round((invites.total / invites.members) * 100) : 0}%`} />
+            </dl>
+            <h2 className="eyebrow mb-2 mt-6">{t(locale, "admin.invitesTop")}</h2>
+            <ul className="glass divide-y divide-line/70 overflow-hidden">
+              {invites.inviters.map(({ user: u, count }) => (
+                <li key={u.id} className="flex items-center gap-3 px-4 py-3">
+                  <UserAvatar name={u.name} seed={u.handle} src={avatarUrl(u.avatarKey)} size={36} />
+                  <Link href={`/u/${u.handle}`} className="min-w-0 flex-1 truncate text-[14.5px] font-semibold hover:underline">
+                    {u.name} <span className="font-normal text-faint">@{u.handle}</span>
+                  </Link>
+                  <span className="text-[15px] font-semibold tabular-nums text-accent-ink">{count}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
       <p className="mt-8 px-1 text-center text-[11.5px] text-faint">{t(locale, "admin.footer")}</p>
     </TabPage>
   );
@@ -195,6 +223,15 @@ async function loadReports() {
     return opp ? [{ opp, reports: open.filter((r) => r.targetId === id) }] : [];
   });
   return { groups, hidden };
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="glass p-3.5">
+      <dt className="text-[12px] leading-snug text-faint">{label}</dt>
+      <dd className="mt-1 text-[24px] font-semibold tabular-nums tracking-tight">{value}</dd>
+    </div>
+  );
 }
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
