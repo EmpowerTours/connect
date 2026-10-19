@@ -1,0 +1,7 @@
+out/
+cache/
+broadcast/
+# Dry runs (anvil fork, Solonet) never land in the repo; only the real
+# testnet record (deployments/monad-testnet.json) is committed.
+deployments/*-dryrun-*
+broadcast-dryrun/

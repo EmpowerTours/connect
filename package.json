@@ -27,6 +27,9 @@
     "screenshots:graph": "tsx scripts/screenshots-graph.ts",
     "logos": "tsx scripts/fetch-logos.ts",
     "graph:verify": "tsx scripts/verify-graph.ts",
+    "contracts:test": "cd contracts && forge test",
+    "protocol:deploy": "tsx scripts/protocol-deploy.ts",
+    "protocol:flows": "tsx scripts/protocol-solonet-flows.ts",
     "start:prod": "node scripts/start.mjs"
   },
   "dependencies": {
