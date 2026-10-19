@@ -240,15 +240,20 @@ async function main() {
     primaryType: "Register",
     message: { owner: reg.owner, recovery: reg.recovery, keyType: 1, keyHash: phone.hash, scope: ALL, expiresAt, nonce: regNonce, deadline: reg.deadline },
   });
-  const existing = await pub.readContract({
-    address: (await read<Address>("idRegistry")),
-    abi: [{ type: "function", name: "idOf", stateMutability: "view", inputs: [{ type: "address" }], outputs: [{ type: "uint64" }] }],
-    functionName: "idOf",
-    args: [owner.address],
-  });
+  const idRegistry = await read<Address>("idRegistry");
+  const idOfOwner = () =>
+    pub.readContract({
+      address: idRegistry,
+      abi: [{ type: "function", name: "idOf", stateMutability: "view", inputs: [{ type: "address" }], outputs: [{ type: "uint64" }] }],
+      functionName: "idOf",
+      args: [owner.address],
+    });
+  const existing = await idOfOwner();
   if (existing !== BigInt(0)) throw new Error(`owner already has ID ${existing} on this deployment; redeploy with npm run protocol:deploy -- --solonet`);
   await send("register (+1 device key)", "register", [reg, regSig]);
-  const id = BigInt(1);
+  // Read the ID the gateway actually assigned; other accounts may have registered first.
+  const id = await idOfOwner();
+  if (id === BigInt(0)) throw new Error("register succeeded but owner has no ID");
 
   // 2. instant add: owner + GUARD device (phone) add the laptop.
   let a = await action(id, Kind.AddKey, { keyType: 1, keyHash: laptop.hash, scope: ALL, expiresAt });
