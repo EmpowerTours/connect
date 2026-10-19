@@ -39,6 +39,8 @@ export const RATE_LIMITS = {
   import: { limit: 12, windowSeconds: 3600 },
   /** Signed graph batches, per member (each batch holds up to 200 updates). */
   graphSign: { limit: 30, windowSeconds: 3600 },
+  /** Connect protocol: relay, prepare and broadcast requests, per member (the relayer has its own spend rules). */
+  protocol: { limit: 30, windowSeconds: 3600 },
   /** One background news ingest per half hour across all instances (see ingest-schedule.ts). */
   ingestClaim: { limit: 1, windowSeconds: 1800 },
 } as const satisfies Record<string, LimitRule>;
