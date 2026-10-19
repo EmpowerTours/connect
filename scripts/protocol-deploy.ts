@@ -89,6 +89,8 @@ async function main() {
     }
   }
 
+  // Puts a real broadcast record back after a dry run; runs in `finally` so a failed run still restores it.
+  let restoreRecord: (() => void) | undefined;
   try {
     const chainId = Number(await rpcCall<string>(rpc, "eth_chainId"));
     if (chainId === 143) throw new Error("refusing Monad mainnet (143)");
@@ -135,7 +137,7 @@ async function main() {
     const recDir = path.join(C, "broadcast/DeployTestnet.s.sol", String(chainId));
     const bak = `${recDir}.real-bak`;
     if (MODE !== "broadcast" && existsSync(recDir)) renameSync(recDir, bak);
-    const restore = () => {
+    restoreRecord = () => {
       if (existsSync(bak)) {
         rmSync(recDir, { recursive: true, force: true });
         renameSync(bak, recDir);
@@ -143,9 +145,9 @@ async function main() {
     };
     const r = spawnSync(forge, forgeArgs, { cwd: C, env: { ...env, OUT }, encoding: "utf8" });
     if (r.status !== 0) {
-      restore();
       console.error((r.stdout ?? "").slice(-3000), (r.stderr ?? "").slice(-3000));
-      process.exit(r.status ?? 1);
+      process.exitCode = r.status ?? 1;
+      return;
     }
 
     const rec = JSON.parse(readFileSync(path.join(recDir, "run-latest.json"), "utf8")) as {
@@ -165,7 +167,6 @@ async function main() {
       mkdirSync(path.dirname(dry), { recursive: true });
       rmSync(dry, { recursive: true, force: true });
       renameSync(recDir, dry);
-      restore();
       console.log(`dry run only; throwaway addresses in contracts/${OUT}`);
     } else {
       mkdirSync(path.join(ROOT, "deployments"), { recursive: true });
@@ -173,6 +174,7 @@ async function main() {
       console.log("DEPLOYED. deployments/monad-testnet.json written; commit it so the app can point at 10143.");
     }
   } finally {
+    restoreRecord?.();
     anvil?.kill();
   }
 }
