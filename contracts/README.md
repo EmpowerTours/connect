@@ -29,6 +29,12 @@ contracts, no owner, no upgrade path:
   - the recovery reset: owner + device only;
   - a device can't cancel its own removal when owner + another device started it; it can
     cancel an owner-only removal, so a single-device member survives a stolen Mera key.
+- **Known tradeoff: no recovery address + one stolen GUARD device.** With `recovery` unset, a
+  thief holding the member's only GUARD device can cancel every owner-only op (add, remove or
+  unsuspend a device, change recovery, transfer ownership), and suspending the device does not
+  remove that power. No recovery reset is possible without a recovery address. The member is
+  locked out of those changes until the device key expires, up to `MAX_KEY_LIFETIME` (730 days).
+  The thief still can't start any change. Setting a recovery address at signup closes this.
 - **Pending ops:** max 5 per signer tier, so a thief with one key can't fill the member's slots.
   Transfer, reset and recovery change invalidate every other pending op of that ID.
 - **Pause:** the guardian, a Safe, can pause registration and key additions for at most 14 days,

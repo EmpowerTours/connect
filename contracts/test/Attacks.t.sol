@@ -406,6 +406,38 @@ contract AttacksTest is Base {
         assertEq(ids.recoveryOf(id), thief, "accepted residual risk");
     }
 
+    // ------------------- known tradeoff: no recovery + one stolen GUARD device
+
+    /// @dev Documented in contracts/README.md. With no recovery address, a thief
+    ///      holding the only GUARD device can cancel owner-only ops (suspension
+    ///      keeps that power) until the key expires; then the owner gets through.
+    function test_noRecovery_stolenGuardDeviceVetoesUntilExpiry() public {
+        ConnectGateway.RegisterParams memory p = regParams(owner, address(0), phonePk, ALL);
+        uint64 id = gw.register(p, signRegister(ownerPk, p));
+        uint40 expiresAt = p.expiresAt;
+
+        // the owner suspends the stolen phone; it still cancels the owner's removal of it
+        ConnectGateway.Action memory s = actKey(id, ConnectGateway.Kind.SuspendKey, phonePk);
+        gw.suspendKey(s, authOwner(ownerPk, s));
+        ConnectGateway.Action memory a = actKey(id, ConnectGateway.Kind.RemoveKey, phonePk);
+        ConnectGateway.Op memory op = startOp(a, authOwner(ownerPk, a), "", 0);
+        ConnectGateway.Action memory c = cancelAct(id, op);
+        gw.cancel(c, authDevice(phonePk, c), op);
+        assertFalse(isPending(op), "vetoed while the key is unexpired");
+
+        // once the key expires it loses cancel power and the removal lands
+        vm.warp(uint256(expiresAt));
+        a = actKey(id, ConnectGateway.Kind.RemoveKey, phonePk);
+        op = startOp(a, authOwner(ownerPk, a), "", 0);
+        c = cancelAct(id, op);
+        ConnectGateway.Auth memory auth = authDevice(phonePk, c);
+        vm.expectRevert(ConnectGateway.NotGuard.selector);
+        gw.cancel(c, auth, op);
+        vm.warp(block.timestamp + delay);
+        gw.finalize(op, "");
+        assertFalse(keys.isLive(id, p256Hash(phonePk)), "removed after expiry");
+    }
+
     // ----------------------------------------- front-running register
 
     function test_frontrun_registerCannotAlterIntent() public {
