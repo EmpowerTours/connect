@@ -32,6 +32,7 @@
     "protocol:flows": "tsx scripts/protocol-solonet-flows.ts",
     "protocol:abi": "tsx scripts/protocol-abi.ts",
     "protocol:wiring-e2e": "tsx scripts/protocol-wiring-e2e.ts",
+    "protocol:sponsor-e2e": "tsx scripts/protocol-sponsor-e2e.ts",
     "relayer:dev": "tsx relayer/server.ts",
     "start:prod": "node scripts/start.mjs"
   },

@@ -17,6 +17,8 @@ import { getProtocol } from "./config";
 import { relayerForwardingEnabled } from "./env-check";
 import { grantSponsorship as grant, sponsorEligibility as eligibility } from "./relayer/eligibility";
 import type { Eligibility } from "./relayer/policy";
+import { grantInvite, type InviteGrant } from "./sponsor/checks";
+import { PrismaSponsorStore } from "./sponsor/store";
 
 export type ProtocolCtx = NonNullable<ReturnType<typeof getProtocol>>;
 
@@ -98,5 +100,26 @@ export async function forwardToRelayer(kind: "register" | "action", member: Prot
   } catch (e) {
     logger.error("[protocol] relayer unreachable", { scope: "protocol", error: e instanceof Error ? e.message : String(e) });
     return json({ error: "sponsored gas is unavailable right now", code: "relayer_unreachable", selfPay: true }, 503);
+  }
+}
+
+export function sponsorStore(): PrismaSponsorStore {
+  return new PrismaSponsorStore(prisma);
+}
+
+/**
+ * Invite sign-ups earn sponsored gas (at most 20 per inviter per rolling 24 h). Call after the
+ * account is created with the inviter resolved (PR #6: prismaAuthDeps.createWithWallet). Works
+ * with the protocol flag off too, so members invited before launch keep their grant. Never
+ * throws: a refusal or a database error must not fail the sign-up.
+ */
+export async function grantInviteSponsorship(userId: string, inviterId: string): Promise<InviteGrant | null> {
+  try {
+    const r = await grantInvite({ store: sponsorStore(), userId, inviterId });
+    if (!r.granted) logger.info("[protocol] invite sponsorship not granted", { scope: "protocol", reason: r.reason });
+    return r;
+  } catch (e) {
+    logger.error("[protocol] invite sponsorship failed", { scope: "protocol", error: e instanceof Error ? e.message : String(e) });
+    return null;
   }
 }
