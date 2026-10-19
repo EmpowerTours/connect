@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AtSign, Briefcase, CalendarDays, Check, Globe, Handshake, KanbanSquare, MapPin, MessageSquareText, Sparkles, UserPlus } from "lucide-react";
@@ -9,18 +10,34 @@ import { EmptyState } from "@/components/empty-state";
 import { IntroModal } from "@/components/intro-modal";
 import { Columns, PageHeader, Tabs } from "@/components/layout";
 import { PostCard } from "@/components/post-card";
-import { getLocale, requireUser } from "@/lib/auth";
+import { getCurrentUser, getLocale } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getUserFeed } from "@/lib/feed";
 import { REGION_LABELS, t } from "@/lib/i18n";
 import { parseList } from "@/lib/json";
-import { linkLabel } from "@/lib/links";
+import { linkLabel, loginPath } from "@/lib/links";
 import { avatarUrl } from "@/lib/media";
 import { isFocusTag } from "@/lib/onboarding";
 import { getPostCtx } from "@/lib/post-ctx";
 import { getGraph, getTrackRecord } from "@/lib/profile";
+import { getPublicUser } from "@/lib/public-pages";
+import { isIndexableMember, publicPageMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
+
+/** Per-profile title, description, canonical and preview (image: ./opengraph-image.tsx). */
+export async function generateMetadata({ params }: { params: Promise<{ handle: string }> }): Promise<Metadata> {
+  const user = await getPublicUser((await params).handle);
+  if (!user) return { title: "Not found", robots: { index: false } };
+  const role = [user.headline || user.role, user.orgName].filter(Boolean).join(" @ ");
+  return publicPageMetadata({
+    title: `${user.name} (@${user.handle})`,
+    description: [role, user.bio].filter(Boolean).join(". "),
+    path: `/u/${user.handle}`,
+    type: "profile",
+    index: isIndexableMember(user),
+  });
+}
 
 export default async function ProfilePage({
   params,
@@ -31,24 +48,27 @@ export default async function ProfilePage({
 }) {
   const { handle } = await params;
   const sp = await searchParams;
-  const me = await requireUser();
-  const locale = await getLocale();
-  const user = await prisma.user.findUnique({
-    where: { handle },
-    include: { org: true, _count: { select: { followers: true, following: true, posts: true } } },
-  });
+  // Readable signed out: `me` is null for visitors, who see public fields only.
+  const [me, locale, user] = await Promise.all([getCurrentUser(), getLocale(), getPublicUser(handle)]);
   if (!user) notFound();
-  const isMe = user.id === me.id;
+  const isMe = !!me && user.id === me.id;
   const focusTags = parseList(user.focusTags).filter(isFocusTag);
   const tab = sp.tab === "replies" ? "replies" : sp.tab === "about" ? "about" : "posts";
-  const [graph, record, ctx] = await Promise.all([getGraph(me.id, user.id), getTrackRecord(user.id), getPostCtx(me, locale)]);
-  const mutualUsers = graph.mutualIds.length
+  const [graph, record, ctx, wallet] = await Promise.all([
+    getGraph(me?.id ?? "", user.id),
+    getTrackRecord(user.id),
+    getPostCtx(me, locale),
+    // The address is loaded for members only; visitors see the badge without it.
+    me ? prisma.user.findUnique({ where: { id: user.id }, select: { walletAddress: true } }) : null,
+  ]);
+  const mutualUsers = me && graph.mutualIds.length
     ? await prisma.user.findMany({ where: { id: { in: graph.mutualIds } }, select: { id: true, name: true, handle: true, isDemo: true, headline: true, orgName: true, avatarKey: true } })
     : [];
-  const items = tab === "about" ? [] : await getUserFeed(me.id, user.id, tab);
+  const items = tab === "about" ? [] : await getUserFeed(me?.id ?? "", user.id, tab);
   const verified = user.workEmailVerified || user.linkedinVerified || user.walletVerified;
-  const canRequestIntro = !isMe && !graph.connected;
+  const canRequestIntro = !!me && !isMe && !graph.connected;
   const base = `/u/${user.handle}`;
+  const walletUser = { walletVerified: user.walletVerified, walletAddress: wallet?.walletAddress ?? null };
 
   const stats = [
     { icon: KanbanSquare, value: record.dealsClosed, label: t(locale, "track.deals"), hint: t(locale, "track.dealsHint") },
@@ -58,14 +78,18 @@ export default async function ProfilePage({
 
   return (
     <Columns>
-      <PageHeader title={user.name} subtitle={`${user._count.posts} ${t(locale, "profile.casts")}`} back="/more" />
+      <PageHeader title={user.name} subtitle={`${user._count.posts} ${t(locale, "profile.casts")}`} back={me ? "/more" : "/"} />
       <section className="border-b border-line">
         <div className="h-28 bg-[radial-gradient(120%_140%_at_0%_0%,rgb(124_92_255/0.55),transparent_55%),radial-gradient(120%_140%_at_100%_100%,rgb(124_92_255/0.25),transparent_60%)] sm:h-36" />
         <div className="px-4 pb-4">
           <div className="-mt-12 flex items-end justify-between gap-3 sm:-mt-14">
             <UserAvatar name={user.name} seed={user.handle} src={avatarUrl(user.avatarKey)} size={96} ring />
             <div className="flex flex-wrap justify-end gap-2 pb-1">
-              {isMe ? (
+              {!me ? (
+                <Link href={loginPath(base, { join: true })} className="btn-primary min-w-[104px]" data-testid="public-follow">
+                  <UserPlus size={16} /> {t(locale, "profile.follow")}
+                </Link>
+              ) : isMe ? (
                 <Link href="/profile" className="btn-secondary">{t(locale, "profile.edit")}</Link>
               ) : (
                 <>
@@ -90,9 +114,9 @@ export default async function ProfilePage({
               {user.name} <VerifiedTick verified={verified} /> {user.isDemo && <DemoBadge locale={locale} />}
             </h2>
             <p className="text-[15px] text-faint">@{user.handle}</p>
-            {user.walletVerified && user.walletAddress ? (
+            {walletUser.walletVerified && (walletUser.walletAddress || !me) ? (
               <div className="mt-2.5">
-                <VerifiedOnMonad user={user} locale={locale} />
+                <VerifiedOnMonad user={walletUser} locale={locale} showAddress={!!me} />
               </div>
             ) : (
               isMe && (
@@ -189,7 +213,7 @@ export default async function ProfilePage({
             <h3 className="label">{t(locale, "profile.bio")}</h3>
             <p className="whitespace-pre-wrap text-fg/90">{user.bio || "—"}</p>
           </div>
-          {!isMe && (
+          {me && !isMe && (
             <div>
               <h3 className="label">{t(locale, "profile.mutualConnections")}</h3>
               {mutualUsers.length ? (
@@ -216,7 +240,7 @@ export default async function ProfilePage({
         items.map((item) => <PostCard key={item.key} item={item} ctx={ctx} />)
       )}
 
-      {sp.intro && canRequestIntro && <IntroModal me={me} target={user} mutual={mutualUsers} introParam={sp.intro} error={sp.error} locale={locale} via={sp.via} />}
+      {me && sp.intro && canRequestIntro && <IntroModal me={me} target={user} mutual={mutualUsers} introParam={sp.intro} error={sp.error} locale={locale} via={sp.via} />}
     </Columns>
   );
 }

@@ -798,6 +798,13 @@ const en = {
   "opps.introErr.rate_limited": "You've sent a lot of intro requests. Please wait a bit before sending more.",
   "opps.reportErr.rate_limited": "You've sent a lot of reports. Please try again later.",
   "composer.rateLimited": "You're posting a lot right now. Please wait a minute and try again.",
+  "public.signIn": "Sign in",
+  "public.joinTitle": `New to ${APP_NAME}?`,
+  "public.joinBody": "Follow people, reply to updates and ask for warm intros. Passkey sign-in, no seed phrase.",
+  "public.joinCta": "Join with a passkey",
+  "public.replyTitle": "Join the conversation",
+  "public.replyBody": "Sign in to reply, like or reshare.",
+  "public.replyCta": "Sign in to reply",
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -1594,6 +1601,13 @@ const es: Record<MessageKey, string> = {
   "opps.introErr.rate_limited": "Enviaste muchas solicitudes de presentación. Espera un poco antes de enviar más.",
   "opps.reportErr.rate_limited": "Enviaste muchos reportes. Inténtalo más tarde.",
   "composer.rateLimited": "Estás publicando mucho ahora. Espera un minuto e inténtalo de nuevo.",
+  "public.signIn": "Iniciar sesión",
+  "public.joinTitle": `¿Nuevo en ${APP_NAME}?`,
+  "public.joinBody": "Sigue a personas, responde actualizaciones y pide intros cálidas. Acceso con passkey, sin frase semilla.",
+  "public.joinCta": "Únete con passkey",
+  "public.replyTitle": "Únete a la conversación",
+  "public.replyBody": "Inicia sesión para responder, dar me gusta o compartir.",
+  "public.replyCta": "Inicia sesión para responder",
 };
 
 export const MESSAGES: Record<Locale, Record<MessageKey, string>> = { en, es };

@@ -43,6 +43,12 @@ describe("safeNextPath (return to a page after sign-in)", () => {
     expect(loginPath("//evil.example")).toBe("/login");
     expect(loginPath(null)).toBe("/login");
   });
+
+  it("loginPath can open the create-account form", () => {
+    expect(loginPath("/post/abc", { join: true })).toBe("/login?join=1&next=%2Fpost%2Fabc");
+    expect(loginPath(null, { join: true })).toBe("/login?join=1");
+    expect(loginPath("//evil.example", { join: true })).toBe("/login?join=1");
+  });
 });
 
 describe("middleware path header", () => {

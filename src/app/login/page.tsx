@@ -12,8 +12,8 @@ import { safeNextPath } from "@/lib/links";
 export const dynamic = "force-dynamic";
 export const metadata = { title: { absolute: APP_FULL_NAME }, alternates: { canonical: "/login" } };
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; next?: string }> }) {
-  const { error, next: rawNext } = await searchParams;
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; next?: string; join?: string }> }) {
+  const { error, next: rawNext, join } = await searchParams;
   // Where they were headed (e.g. a shared profile); only same-origin paths survive.
   const next = safeNextPath(rawNext);
   if (await getCurrentUser()) redirect(next ?? "/");
@@ -63,7 +63,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             </div>
           </div>
           {error === "link" && <p className="mb-3 rounded-xl bg-danger/10 p-2.5 text-sm text-danger">{t(locale, "login.invalid")}</p>}
-          <MeraSignIn locale={locale} next={next} />
+          <MeraSignIn locale={locale} next={next} join={join === "1"} />
           <div className="mt-4 flex items-start justify-between gap-3 border-t border-line pt-3">
             <p className="flex items-start gap-1.5 text-xs leading-snug text-faint">
               <Lock size={13} className="mt-px shrink-0" />

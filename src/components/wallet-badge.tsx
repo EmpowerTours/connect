@@ -10,16 +10,19 @@ export function VerifiedOnMonad({
   user,
   locale,
   size = "md",
+  showAddress = true,
 }: {
   user: { walletVerified: boolean; walletAddress: string | null };
   locale: Locale;
   size?: "sm" | "md";
+  /** false on public pages for signed-out visitors: the badge without the address (which is then not loaded). */
+  showAddress?: boolean;
 }) {
-  if (!user.walletVerified || !user.walletAddress) return null;
+  if (!user.walletVerified || (showAddress && !user.walletAddress)) return null;
   const sm = size === "sm";
   return (
     <span
-      title={`${t(locale, "wallet.verifiedHint")} ${user.walletAddress}`}
+      title={showAddress ? `${t(locale, "wallet.verifiedHint")} ${user.walletAddress}` : t(locale, "wallet.verifiedHint")}
       className={`inline-flex items-center gap-1.5 rounded-full border border-lilac bg-gradient-to-r from-accent-soft to-white font-semibold text-accent-ink shadow-[0_4px_14px_-8px_rgb(124_58_237/0.55)] ${
         sm ? "px-2 py-0.5 text-[11px]" : "py-1 pl-1 pr-3 text-[13px]"
       }`}
@@ -28,9 +31,11 @@ export function VerifiedOnMonad({
         <ShieldCheck size={sm ? 11 : 14} strokeWidth={2.4} />
       </span>
       {t(locale, "wallet.verifiedOnMonad")}
-      <span className="font-mono font-medium text-accent/80" aria-label={user.walletAddress}>
-        · {shortAddress(user.walletAddress)}
-      </span>
+      {showAddress && user.walletAddress && (
+        <span className="font-mono font-medium text-accent/80" aria-label={user.walletAddress}>
+          · {shortAddress(user.walletAddress)}
+        </span>
+      )}
     </span>
   );
 }

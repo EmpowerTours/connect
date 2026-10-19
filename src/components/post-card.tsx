@@ -6,6 +6,7 @@ import { t } from "@/lib/i18n";
 import { OrgLogo, UserAvatar } from "./avatar";
 import { DemoBadge, PostKindChip, VerifiedTick } from "./badges";
 import { PostActions } from "./post-actions";
+import { PublicPostCounts } from "./public-post-counts";
 import { RichText } from "./rich-text";
 import { timeAgo } from "./time";
 
@@ -13,7 +14,8 @@ export interface PostCtx {
   locale: Locale;
   known: { orgs: Set<string>; handles: Set<string>; channels: Set<string> };
   channels: { slug: string; name: string }[];
-  viewer: { name: string; handle: string };
+  /** null on public pages for signed-out visitors. */
+  viewer: { name: string; handle: string } | null;
 }
 
 type Author = FeedPost["author"];
@@ -112,25 +114,29 @@ export function PostCard({ item, ctx, variant = "feed", connector }: { item: Fee
               {post.createdAt.toLocaleString(ctx.locale === "es" ? "es-MX" : "en-US", { hour: "numeric", minute: "2-digit", month: "short", day: "numeric", year: "numeric" })}
             </p>
           )}
-          <PostActions
-            postId={post.id}
-            locale={ctx.locale}
-            counts={{ replies: post._count.replies, recasts: post._count.recasts, likes: post._count.likes }}
-            liked={post.likes.length > 0}
-            recasted={post.recasts.length > 0}
-            channels={ctx.channels}
-            viewerAvatar={<UserAvatar name={ctx.viewer.name} seed={ctx.viewer.handle} size={42} />}
-            quotePreview={
-              <div className="rounded-2xl border border-line p-3">
-                <div className="flex items-center gap-2 text-[13px]">
-                  <UserAvatar name={post.author.name} seed={post.author.handle} size={20} />
-                  <span className="font-semibold">{post.author.name}</span>
-                  <span className="text-faint">@{post.author.handle}</span>
+          {!ctx.viewer ? (
+            <PublicPostCounts postId={post.id} locale={ctx.locale} counts={{ replies: post._count.replies, recasts: post._count.recasts, likes: post._count.likes }} />
+          ) : (
+            <PostActions
+              postId={post.id}
+              locale={ctx.locale}
+              counts={{ replies: post._count.replies, recasts: post._count.recasts, likes: post._count.likes }}
+              liked={post.likes.length > 0}
+              recasted={post.recasts.length > 0}
+              channels={ctx.channels}
+              viewerAvatar={<UserAvatar name={ctx.viewer.name} seed={ctx.viewer.handle} size={42} />}
+              quotePreview={
+                <div className="rounded-2xl border border-line p-3">
+                  <div className="flex items-center gap-2 text-[13px]">
+                    <UserAvatar name={post.author.name} seed={post.author.handle} size={20} />
+                    <span className="font-semibold">{post.author.name}</span>
+                    <span className="text-faint">@{post.author.handle}</span>
+                  </div>
+                  <p className="mt-1.5 line-clamp-3 text-[14px] text-fg/90">{post.body}</p>
                 </div>
-                <p className="mt-1.5 line-clamp-3 text-[14px] text-fg/90">{post.body}</p>
-              </div>
-            }
-          />
+              }
+            />
+          )}
         </div>
       </div>
     </article>

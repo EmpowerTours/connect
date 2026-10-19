@@ -43,12 +43,13 @@ export function ProofBadges({
   locale,
   showWallet = true,
 }: {
-  user: { workEmailVerified: boolean; linkedinVerified: boolean; walletVerified: boolean; walletAddress: string | null };
+  /** walletAddress may be left out where it is not shown (public pages for visitors, showWallet false). */
+  user: { workEmailVerified: boolean; linkedinVerified: boolean; walletVerified: boolean; walletAddress?: string | null };
   locale: Locale;
   /** false where the Verified on Monad badge is already shown prominently. */
   showWallet?: boolean;
 }) {
-  const walletOk = user.walletVerified && !!user.walletAddress;
+  const walletOk = user.walletVerified && (!!user.walletAddress || !showWallet);
   const items = [
     { key: "email", icon: Mail, label: t(locale, "proof.workEmail"), ok: user.workEmailVerified },
     { key: "linkedin", icon: IdCard, label: "LinkedIn", ok: user.linkedinVerified },
@@ -58,7 +59,7 @@ export function ProofBadges({
     <ul className="flex flex-wrap items-center gap-1.5">
       {walletOk && showWallet && (
         <li>
-          <VerifiedOnMonad user={user} locale={locale} size="sm" />
+          <VerifiedOnMonad user={{ walletVerified: user.walletVerified, walletAddress: user.walletAddress ?? null }} locale={locale} size="sm" />
         </li>
       )}
       {items.map(({ key, icon: Icon, label, ok }) => (
