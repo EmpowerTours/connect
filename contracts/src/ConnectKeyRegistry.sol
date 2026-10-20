@@ -18,6 +18,11 @@ pragma solidity 0.8.28;
 ///         existing key stale at once (no loop over keys).
 ///
 ///         Pure storage: only the gateway that deployed it can mutate it.
+///
+///         The per-epoch add cap and the "requested by" record follow Farcaster's
+///         KeyRegistry (maxKeysPerFid) and SignedKeyRequestValidator.
+///         Copyright (c) 2020-2024 Merkle Manufactory and others, MIT License;
+///         see THIRD_PARTY_NOTICES.md.
 contract ConnectKeyRegistry {
     enum State {
         None,
@@ -41,6 +46,7 @@ contract ConnectKeyRegistry {
     struct IdKeys {
         uint32 epoch;
         uint8 live; // Active + Suspended keys in the current epoch
+        uint16 added; // keys added in the current epoch, including re-adds and later removed ones
     }
 
     uint8 public constant TYPE_P256 = 1;
@@ -55,6 +61,10 @@ contract ConnectKeyRegistry {
     uint8 public constant SCOPE_ALL = 63;
 
     uint8 public constant MAX_LIVE_KEYS = 20;
+    /// @notice Bounds the KeyAdded events (indexer work) one ID can cause per key
+    ///         epoch. A recovery reset starts a new epoch, so a thief cannot use up
+    ///         the cap for good.
+    uint16 public constant MAX_KEYS_PER_EPOCH = 1000;
     uint256 public constant MAX_KEY_LIFETIME = 730 days;
 
     error NotGateway();
@@ -68,6 +78,9 @@ contract ConnectKeyRegistry {
     event KeyAdded(
         uint64 indexed id, bytes32 indexed keyHash, uint8 keyType, uint8 scope, uint40 expiresAt, bytes key
     );
+    /// @notice Emitted with {KeyAdded} when the key was added at the signed
+    ///         request of another Connect ID (an app or mini app).
+    event KeyRequested(uint64 indexed id, bytes32 indexed keyHash, uint64 indexed requestedBy);
     event KeySuspended(uint64 indexed id, bytes32 indexed keyHash);
     event KeyUnsuspended(uint64 indexed id, bytes32 indexed keyHash);
     event KeyRetired(uint64 indexed id, bytes32 indexed keyHash);
@@ -78,6 +91,8 @@ contract ConnectKeyRegistry {
 
     mapping(uint64 id => mapping(bytes32 keyHash => Key)) internal _keys;
     mapping(uint64 id => IdKeys) public idKeys;
+    /// @notice Connect ID of the app that requested the key at its latest add; 0 if none.
+    mapping(uint64 id => mapping(bytes32 keyHash => uint64 requestedBy)) public requestedByOf;
 
     constructor() {
         gateway = msg.sender;
@@ -167,12 +182,17 @@ contract ConnectKeyRegistry {
             bool stale = k.epoch != idKeys[id].epoch;
             if (!stale || k.state == State.Retired || k.state == State.Removed) revert KeyExists();
         }
-        if (idKeys[id].live >= MAX_LIVE_KEYS) revert TooManyKeys();
+        IdKeys storage ik = idKeys[id];
+        if (ik.live >= MAX_LIVE_KEYS || ik.added >= MAX_KEYS_PER_EPOCH) revert TooManyKeys();
     }
 
     // ------------------------------------------------------------ mutations
 
-    function add(uint64 id, uint8 keyType, bytes calldata key, uint8 scope, uint40 expiresAt) external onlyGateway {
+    /// @param requestedBy Connect ID whose signed key request the gateway checked; 0 if none.
+    function add(uint64 id, uint8 keyType, bytes calldata key, uint8 scope, uint40 expiresAt, uint64 requestedBy)
+        external
+        onlyGateway
+    {
         bytes32 keyHash = checkAdd(id, keyType, key, scope, expiresAt);
         IdKeys storage ik = idKeys[id];
         Key storage k = _keys[id][keyHash];
@@ -188,8 +208,11 @@ contract ConnectKeyRegistry {
         });
         unchecked {
             ik.live += 1;
+            ik.added += 1;
         }
+        if (requestedByOf[id][keyHash] != requestedBy) requestedByOf[id][keyHash] = requestedBy;
         emit KeyAdded(id, keyHash, keyType, scope, expiresAt, key);
+        if (requestedBy != 0) emit KeyRequested(id, keyHash, requestedBy);
     }
 
     function suspend(uint64 id, bytes32 keyHash) external onlyGateway {
@@ -249,6 +272,7 @@ contract ConnectKeyRegistry {
         }
         ik.epoch = epoch;
         ik.live = 0;
+        ik.added = 0;
         emit KeysReset(id, epoch);
     }
 

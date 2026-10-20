@@ -137,6 +137,16 @@ contract ConnectGateway is EIP712 {
         uint8 pendingRecovery;
     }
 
+    /// @notice Signed by the owner of `requestId` (an app's Connect ID) to say
+    ///         "this key on `id` was added for my app". Follows Farcaster's
+    ///         SignedKeyRequest (MIT, see THIRD_PARTY_NOTICES.md); unlike it, the
+    ///         signed data also names the target ID.
+    struct KeyRequest {
+        uint64 requestId;
+        uint256 deadline;
+        bytes sig;
+    }
+
     struct RegisterParams {
         address owner;
         address recovery;
@@ -173,6 +183,9 @@ contract ConnectGateway is EIP712 {
         "Action(uint64 id,uint8 kind,address account,uint8 keyType,bytes32 keyHash,uint8 scope,uint40 expiresAt,bool flag,bytes32 opId,uint256 nonce,uint256 deadline)"
     );
 
+    bytes32 public constant KEY_REQUEST_TYPEHASH =
+        keccak256("KeyRequest(uint64 requestId,uint64 id,bytes32 keyHash,uint256 deadline)");
+
     error BadDelay();
     error Expired();
     error UnknownId();
@@ -194,6 +207,7 @@ contract ConnectGateway is EIP712 {
     error NotGuardian();
     error BadPause();
     error FirstKeyNotGuard();
+    error BadKeyRequest();
 
     event OpStarted(bytes32 indexed opId, uint64 indexed id, Op op, uint40 readyAt, bytes key);
     event OpCancelled(bytes32 indexed opId, uint64 indexed id, Signer by);
@@ -309,6 +323,14 @@ contract ConnectGateway is EIP712 {
         );
     }
 
+    function keyRequestDigest(uint64 requestId, uint64 id, bytes32 keyHash, uint256 deadline)
+        public
+        view
+        returns (bytes32)
+    {
+        return _hashTypedDataV4(keccak256(abi.encode(KEY_REQUEST_TYPEHASH, requestId, id, keyHash, deadline)));
+    }
+
     /// @notice Delay that applies to a delayed op kind.
     function delayOf(Kind kind) public view returns (uint256) {
         return kind == Kind.TransferOwner || kind == Kind.ChangeRecovery ? longDelay : delay;
@@ -351,18 +373,37 @@ contract ConnectGateway is EIP712 {
             registerNonce[p.owner] = nonce + 1;
         }
         id = idRegistry.register(p.owner, p.recovery);
-        keyRegistry.add(id, p.keyType, p.key, p.scope, p.expiresAt);
+        keyRegistry.add(id, p.keyType, p.key, p.scope, p.expiresAt, 0);
     }
 
     // ===================================================== instant actions
 
     /// @notice Owner + GUARD device: add a key now.
     function addKey(Action calldata a, Auth calldata auth, bytes calldata key) external whenNotPaused {
+        _addKey(a, auth, key, 0);
+    }
+
+    /// @notice Same as {addKey}, and records which app asked for the key. The
+    ///         app's owner signs a {KeyRequest} for this ID and key.
+    function addKeyRequested(Action calldata a, Auth calldata auth, bytes calldata key, KeyRequest calldata req)
+        external
+        whenNotPaused
+    {
+        if (block.timestamp > req.deadline) revert Expired();
+        (address appOwner,) = idRegistry.recordOf(req.requestId);
+        if (req.requestId == 0 || appOwner == address(0)) revert BadKeyRequest();
+        if (!_isValidSig(appOwner, keyRequestDigest(req.requestId, a.id, a.keyHash, req.deadline), req.sig)) {
+            revert BadKeyRequest();
+        }
+        _addKey(a, auth, key, req.requestId);
+    }
+
+    function _addKey(Action calldata a, Auth calldata auth, bytes calldata key, uint64 requestedBy) private {
         if (a.kind != Kind.AddKey) revert BadKind();
         if (auth.signer != Signer.OwnerDevice) revert BadSigner();
         _authorize(a, auth);
         if (keyRegistry.keyHashOf(a.keyType, key) != a.keyHash) revert KeyMismatch();
-        keyRegistry.add(a.id, a.keyType, key, a.scope, a.expiresAt);
+        keyRegistry.add(a.id, a.keyType, key, a.scope, a.expiresAt, requestedBy);
     }
 
     /// @notice Owner (alone or with a device): suspend a key now. Suspension
@@ -493,7 +534,7 @@ contract ConnectGateway is EIP712 {
             idRegistry.setRecovery(op.id, op.account);
         } else if (k == Kind.AddKey) {
             if (keyRegistry.keyHashOf(op.keyType, key) != op.keyHash) revert KeyMismatch();
-            keyRegistry.add(op.id, op.keyType, key, op.scope, op.expiresAt);
+            keyRegistry.add(op.id, op.keyType, key, op.scope, op.expiresAt, 0);
         } else if (k == Kind.RemoveKey) {
             keyRegistry.remove(op.id, op.keyHash);
         } else {

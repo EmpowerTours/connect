@@ -38,8 +38,10 @@ contract ProtocolInvariantTest is Base {
     }
 
     function invariant_liveKeysBounded() public view {
-        (, uint8 live) = keys.idKeys(id);
+        (, uint8 live, uint16 added) = keys.idKeys(id);
         assertLe(live, keys.MAX_LIVE_KEYS());
+        assertLe(live, added);
+        assertLe(added, keys.MAX_KEYS_PER_EPOCH());
     }
 
     function invariant_idMapsOneToOne() public view {

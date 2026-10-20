@@ -7,7 +7,7 @@ contracts, no owner, no upgrade path:
 |---|---|
 | `ConnectGateway` | The only writer. Verifies EIP-712 signatures (owner and recovery: ECDSA, then ERC-1271; devices: P-256 or secp256k1), runs the timelock, the cancel matrix and the pause guardian. Deploys both registries in its constructor. |
 | `ConnectIdRegistry` | Connect ID → owner (the member's Mera wallet) and optional recovery address. One ID per owner. |
-| `ConnectKeyRegistry` | Device keys per ID: type, scopes (POST, REACT, FOLLOW, PROFILE, ATTEST, GUARD), expiry, Active/Suspended/Retired/Removed, max 20 live keys, O(1) reset by key epoch. |
+| `ConnectKeyRegistry` | Device keys per ID: type, scopes (POST, REACT, FOLLOW, PROFILE, ATTEST, GUARD), expiry, Active/Suspended/Retired/Removed, max 20 live keys and 1,000 adds per key epoch, optional "requested by" app ID (signed key request, `addKeyRequested`), O(1) reset by key epoch. |
 
 ## Rules enforced on chain
 
