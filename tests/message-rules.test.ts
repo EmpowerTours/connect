@@ -42,6 +42,8 @@ describe("message rules (Farcaster-derived)", () => {
     expect(validateEmbed({ ref: { id: BigInt(0), hash: H } }).ok).toBe(false);
     expect(validateEmbed({ ref: { id: BigInt(1), hash: "0x12" } }).ok).toBe(false);
     expect(validateEmbed({} as never).ok).toBe(false);
+    expect(validateEmbed(null as never).ok).toBe(false);
+    expect(validateEmbed("x" as never).ok).toBe(false);
   });
 
   it("limits URLs to 1..256 bytes", () => {

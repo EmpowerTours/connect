@@ -81,6 +81,7 @@ export function validateRef(ref: MessageRef | undefined): RuleResult {
 }
 
 export function validateEmbed(embed: Embed): RuleResult {
+  if (embed === null || typeof embed !== "object") return fail("embed is invalid");
   const hasUrl = "url" in embed && embed.url !== undefined;
   const hasRef = "ref" in embed && embed.ref !== undefined;
   if (hasUrl && hasRef) return fail("cannot use both url and ref");

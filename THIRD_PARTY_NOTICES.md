@@ -10,11 +10,12 @@ Parts of the following files are adapted from Farcaster's MIT-licensed code
   per-ID key cap and the signed key request (which app asked for a key), from
   `src/KeyRegistry.sol` and `src/validators/SignedKeyRequestValidator.sol`
 
-hub-monorepo license (contracts uses the same MIT text, "Copyright (c) 2020-2024 Merkle Manufactory and others"):
+Both repositories use the same MIT license text:
 
 The MIT License (MIT)
 
-Copyright (c) 2020-2025 Merkle Manufactory and others
+Copyright (c) 2020-2025 Merkle Manufactory and others (hub-monorepo)
+Copyright (c) 2020-2024 Merkle Manufactory and others (contracts)
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
