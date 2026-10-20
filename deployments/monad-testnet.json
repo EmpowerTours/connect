@@ -5,11 +5,11 @@
   "devBuild": false,
   "eip712Name": "ConnectProtocol",
   "eip712Version": "1",
-  "fromBlock": 72085165,
-  "gateway": "0x23252C400a7981F4BdB505D825d622Afe1F8B21e",
+  "fromBlock": 72551710,
+  "gateway": "0xA18079a087a12E53B39EAC6637508F534ddecB41",
   "guardian": "0x27876B01B215883F2a3c4004B07D70dE88C7231D",
   "guardianNote": "Pause-only (registrations and key additions, max 14 days, 14-day cooldown, renounceable). Testnet: deployer. Mainnet: EmpowerTours 2-of-3 Safe.",
-  "idRegistry": "0xE444153c1BD01Eb38A2AbAB9CfE7d75522068609",
-  "keyRegistry": "0xF29b6b7d172bD82EE3927a565E4C3DA77F4d1f93",
+  "idRegistry": "0x84B52C39946B4799A75aBB981Ae0DF5C9ef094E6",
+  "keyRegistry": "0xa818DFE2bff845eF52E2851B8c1e5e29e701a42B",
   "longDelaySeconds": 604800
 }

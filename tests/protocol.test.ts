@@ -62,8 +62,8 @@ describe("chain config", () => {
 describe("deployments", () => {
   it("accepts the committed testnet record", () => {
     const d = parseDeployment(testnetJson, CHAIN_TESTNET);
-    expect(d.gateway).toBe("0x23252C400a7981F4BdB505D825d622Afe1F8B21e");
-    expect(d.fromBlock).toBe(BigInt(72085165));
+    expect(d.gateway).toBe("0xA18079a087a12E53B39EAC6637508F534ddecB41");
+    expect(d.fromBlock).toBe(BigInt(72551710));
     expect(d.devBuild).toBe(false);
   });
   it("refuses a chain mismatch, a dev build off Solonet, wrong testnet delays and a wrong domain", () => {
