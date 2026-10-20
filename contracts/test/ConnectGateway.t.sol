@@ -28,7 +28,7 @@ contract ConnectGatewayTest is Base {
         assertEq(ids.recoveryOf(1), recovery);
         assertTrue(keys.canSign(1, p256Hash(phonePk), ALL));
         assertTrue(keys.hasGuardPower(1, p256Hash(phonePk)));
-        (uint32 epoch, uint8 live) = keys.idKeys(1);
+        (uint32 epoch, uint8 live,) = keys.idKeys(1);
         assertEq(epoch, 0);
         assertEq(live, 1);
     }
@@ -255,7 +255,7 @@ contract ConnectGatewayTest is Base {
         gw.retireKey(a, devSig(phonePk, digestDevice(a, phonePk)));
         assertEq(uint8(keys.stateOf(id, p256Hash(phonePk))), uint8(ConnectKeyRegistry.State.Retired));
         assertFalse(keys.hasGuardPower(id, p256Hash(phonePk)));
-        (, uint8 live) = keys.idKeys(id);
+        (, uint8 live,) = keys.idKeys(id);
         assertEq(live, 0);
     }
 
@@ -401,7 +401,7 @@ contract ConnectGatewayTest is Base {
         gw.finalize(rem, "");
         assertTrue(keys.canSign(id, p256Hash(laptopPk), ALL));
         assertEq(uint8(keys.stateOf(id, p256Hash(phonePk))), uint8(ConnectKeyRegistry.State.Removed));
-        (, uint8 live) = keys.idKeys(id);
+        (, uint8 live,) = keys.idKeys(id);
         assertEq(live, 1);
     }
 
@@ -423,7 +423,7 @@ contract ConnectGatewayTest is Base {
         assertEq(ids.ownerOf(id), newOwner);
         assertFalse(keys.canSign(id, p256Hash(phonePk), 1));
         assertFalse(keys.hasGuardPower(id, p256Hash(phonePk)));
-        (uint32 epoch, uint8 live) = keys.idKeys(id);
+        (uint32 epoch, uint8 live,) = keys.idKeys(id);
         assertEq(epoch, 1);
         assertEq(live, 0);
         // a stale (not retired/removed) key may be re-added after the reset

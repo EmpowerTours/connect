@@ -92,6 +92,19 @@ export const gatewayAbi = [
   },
   {
     "type": "function",
+    "name": "KEY_REQUEST_TYPEHASH",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "MAX_PAUSE",
     "inputs": [],
     "outputs": [
@@ -361,6 +374,137 @@ export const gatewayAbi = [
         "name": "key",
         "type": "bytes",
         "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "addKeyRequested",
+    "inputs": [
+      {
+        "name": "a",
+        "type": "tuple",
+        "internalType": "struct ConnectGateway.Action",
+        "components": [
+          {
+            "name": "id",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "kind",
+            "type": "uint8",
+            "internalType": "enum ConnectGateway.Kind"
+          },
+          {
+            "name": "account",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "keyType",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "keyHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "scope",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "expiresAt",
+            "type": "uint40",
+            "internalType": "uint40"
+          },
+          {
+            "name": "flag",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "opId",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "deadline",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "auth",
+        "type": "tuple",
+        "internalType": "struct ConnectGateway.Auth",
+        "components": [
+          {
+            "name": "signer",
+            "type": "uint8",
+            "internalType": "enum ConnectGateway.Signer"
+          },
+          {
+            "name": "sig",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "device",
+            "type": "tuple",
+            "internalType": "struct ConnectGateway.DeviceSig",
+            "components": [
+              {
+                "name": "keyType",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "key",
+                "type": "bytes",
+                "internalType": "bytes"
+              },
+              {
+                "name": "sig",
+                "type": "bytes",
+                "internalType": "bytes"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "key",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "req",
+        "type": "tuple",
+        "internalType": "struct ConnectGateway.KeyRequest",
+        "components": [
+          {
+            "name": "requestId",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "deadline",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "sig",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
       }
     ],
     "outputs": [],
@@ -882,6 +1026,40 @@ export const gatewayAbi = [
         "name": "",
         "type": "address",
         "internalType": "contract ConnectKeyRegistry"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "keyRequestDigest",
+    "inputs": [
+      {
+        "name": "requestId",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "id",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "keyHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "deadline",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "stateMutability": "view"
@@ -1836,6 +2014,11 @@ export const gatewayAbi = [
   },
   {
     "type": "error",
+    "name": "BadKeyRequest",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "BadKind",
     "inputs": []
   },
@@ -2230,6 +2413,19 @@ export const keyRegistryAbi = [
   },
   {
     "type": "function",
+    "name": "MAX_KEYS_PER_EPOCH",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint16",
+        "internalType": "uint16"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "MAX_KEY_LIFETIME",
     "inputs": [],
     "outputs": [
@@ -2399,6 +2595,11 @@ export const keyRegistryAbi = [
         "name": "expiresAt",
         "type": "uint40",
         "internalType": "uint40"
+      },
+      {
+        "name": "requestedBy",
+        "type": "uint64",
+        "internalType": "uint64"
       }
     ],
     "outputs": [],
@@ -2529,6 +2730,11 @@ export const keyRegistryAbi = [
         "name": "live",
         "type": "uint8",
         "internalType": "uint8"
+      },
+      {
+        "name": "added",
+        "type": "uint16",
+        "internalType": "uint16"
       }
     ],
     "stateMutability": "view"
@@ -2715,6 +2921,30 @@ export const keyRegistryAbi = [
   },
   {
     "type": "function",
+    "name": "requestedByOf",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "keyHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "requestedBy",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "resetKeys",
     "inputs": [
       {
@@ -2886,6 +3116,31 @@ export const keyRegistryAbi = [
         "type": "bytes32",
         "indexed": true,
         "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "KeyRequested",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint64",
+        "indexed": true,
+        "internalType": "uint64"
+      },
+      {
+        "name": "keyHash",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "requestedBy",
+        "type": "uint64",
+        "indexed": true,
+        "internalType": "uint64"
       }
     ],
     "anonymous": false

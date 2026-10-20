@@ -1,4 +1,5 @@
 import { POST_MAX_LENGTH } from "./constants";
+import { MESSAGE_MENTIONS_MAX, isWellFormedUtf16 } from "./protocol/message-rules";
 
 export const POST_KINDS = ["looking_for_partner", "launch", "hiring", "insight"] as const;
 export type PostKind = (typeof POST_KINDS)[number];
@@ -7,20 +8,28 @@ export function isPostKind(v: string): v is PostKind {
   return (POST_KINDS as readonly string[]).includes(v);
 }
 
-export type PostValidation = { ok: true; body: string } | { ok: false; error: "empty" | "too_long" };
+export type PostValidation = { ok: true; body: string } | { ok: false; error: "empty" | "too_long" | "invalid_text" };
 
 /** Trims and validates a cast body (1–320 chars after trimming, counted in code points). */
 export function validatePostBody(raw: string): PostValidation {
   const body = raw.replace(/\r\n/g, "\n").trim();
   if (!body) return { ok: false, error: "empty" };
+  // Lone surrogates cannot be encoded as UTF-8, so they could never be signed portably.
+  if (!isWellFormedUtf16(body)) return { ok: false, error: "invalid_text" };
   if ([...body].length > POST_MAX_LENGTH) return { ok: false, error: "too_long" };
   return { ok: true, body };
 }
 
-/** `@handle` mentions (not emails), lower-cased and unique, in order of appearance. */
+/**
+ * `@handle` mentions (not emails), lower-cased and unique, in order of appearance.
+ * Only the first 10 are kept (the protocol mention limit); later ones stay as text.
+ */
 export function extractMentions(body: string): string[] {
   const out = new Set<string>();
-  for (const m of body.matchAll(/(?:^|[^\w@.])@([a-z0-9_]{2,24})\b/gi)) out.add(m[1].toLowerCase());
+  for (const m of body.matchAll(/(?:^|[^\w@.])@([a-z0-9_]{2,24})\b/gi)) {
+    out.add(m[1].toLowerCase());
+    if (out.size >= MESSAGE_MENTIONS_MAX) break;
+  }
   return [...out];
 }
 
